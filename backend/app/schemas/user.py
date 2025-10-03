@@ -1,4 +1,6 @@
+# app/schemas/user.py
 from pydantic import BaseModel
+from typing import Optional
 from app.models.user import UserRole
 
 class UserCreate(BaseModel):
@@ -6,6 +8,11 @@ class UserCreate(BaseModel):
     email: str
     password: str
     role: UserRole
+    # opsiyonel alanlar
+    diploma_number: Optional[str] = None
+    workplace: Optional[str] = None
+    specialization: Optional[str] = None
+    profile_image: Optional[str] = None   # Base64 ya da URL olarak tutulabilir
 
 class UserLogin(BaseModel):
     email: str
@@ -13,10 +20,14 @@ class UserLogin(BaseModel):
 
 class UserOut(BaseModel):
     id: int
-    name: str | None = None
+    name: Optional[str] = None
     email: str
     role: UserRole
+    diploma_number: Optional[str] = None
+    workplace: Optional[str] = None
+    specialization: Optional[str] = None
+    profile_image: Optional[str] = None
 
     model_config = {
-        "from_attributes": True  # ✅ Pydantic v2 için doğru kullanım
+        "from_attributes": True
     }

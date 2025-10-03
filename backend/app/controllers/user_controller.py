@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, UserLogin
-from app.services.user_service import register_user, login_user
+from app.services.user_service import register_user, login_user, get_current_user
 from app.database import get_db
+from app.models.user import User
+
 
 router = APIRouter()
 
@@ -20,3 +22,13 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
     if res is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return res  # token ve user JSON olarak dönüyor
+
+# Protected route
+@router.get("/me")
+def read_users_me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "name": current_user.name,
+        "email": current_user.email,
+        "role": current_user.role
+    }
