@@ -6,6 +6,8 @@ from enum import Enum as PyEnum
 class UserRole(str, PyEnum):
     CITIZEN = "citizen"
     DOCTOR = "doctor"
+    ASSISTANT = "assistant"
+    SEKRETER = "sekreter"
 
 
 class User(Base):
@@ -16,8 +18,6 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.CITIZEN)
-
-    # ✅ Ek alanlar
     profile_image = Column(String, nullable=True)       # kullanıcı fotoğrafı
     diploma_number = Column(String, nullable=True)      # sadece doktor için
     workplace = Column(String, nullable=True)           # doktorun görev yaptığı yer

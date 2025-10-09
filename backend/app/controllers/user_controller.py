@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.schemas.user import UserCreate, UserLogin
+from app.schemas.user import UserCreate, UserLogin, UserUpdate, UserOut
 from app.services.user_service import register_user, login_user, get_current_user
 from app.database import get_db
 from app.models.user import User
@@ -32,3 +32,22 @@ def read_users_me(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
         "role": current_user.role
     }
+
+@router.post("/update", response_model=UserOut)
+def update_user(
+    data: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
+    
+    if data.name:
+        user.name = data.name
+    if data.email:
+        user.email = data.email
+    
+    db.commit()
+    db.refresh(user)
+    return user

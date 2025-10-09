@@ -44,7 +44,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
             <ListItemText primary="Panel" />
           </ListItemButton>
         </Link>
-        <Link href="/kisisel_bilgiler" passHref>
+        <Link href="/dashboard/personal-info" passHref>
           <ListItemButton sx={{ textDecoration: "none" }}>
             <ListItemText primary="Kişisel Bilgiler" />
           </ListItemButton>

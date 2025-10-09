@@ -1,5 +1,5 @@
 # app/schemas/user.py
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional
 from app.models.user import UserRole
 
@@ -31,3 +31,8 @@ class UserOut(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None  # opsiyonel

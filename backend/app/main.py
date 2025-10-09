@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import users
+from app.api import users, doctors
 from app.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,3 +16,5 @@ app.add_middleware(
 )
 
 app.include_router(users.router, prefix="/api/users")
+app.include_router(doctors.router, prefix="/api/doctors")
+

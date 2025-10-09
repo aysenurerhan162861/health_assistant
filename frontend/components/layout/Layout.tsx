@@ -4,7 +4,8 @@ import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 
 interface LayoutProps {
-  children: ReactNode;
+  user?: Partial<User> | null; // tüm alanları opsiyonel yap
+  children: React.ReactNode;
 }
 
 interface User {

@@ -44,27 +44,61 @@ def login_user(db: Session, login_data: UserLogin):
     )
     return {"token": token, "user": user}
 
-def get_current_user(token_header: str = Header(...), db: Session = Depends(get_db)):
+def get_current_user(
+    token_header: str = Header(..., alias="token-header"),
+    db: Session = Depends(get_db)
+):
     """
-    Authorization header'dan token alır ve kullanıcıyı doğrular
+    'token-header' header'ından token alır ve kullanıcıyı doğrular
     Header formatı: "Bearer <token>"
     """
+
+    # Debug: raw token log
+    print("Raw token_header:", repr(token_header))
+
+    # Header boş mu kontrolü
+    if not token_header or not token_header.strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token header eksik."
+        )
+
+    token_header = token_header.strip()
+
+    # Bearer formatı kontrolü
     if not token_header.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token formatı hatalı. 'Bearer <token>' şeklinde olmalı."
         )
-    token = token_header.split(" ")[1]
+
+    # Token ayırma
+    token_parts = token_header.split(" ")
+    if len(token_parts) != 2 or not token_parts[1]:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token eksik veya hatalı."
+        )
+
+    token = token_parts[1]
+    print("token sadece:", token)
+
+    # Token doğrulama
     payload = verify_token(token)
+    print("payload:", payload)
+
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Geçersiz veya süresi dolmuş token."
         )
+
+    # Kullanıcı veritabanında var mı kontrolü
     user = db.query(User).filter(User.email == payload.get("sub")).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Kullanıcı bulunamadı."
         )
+
     return user
