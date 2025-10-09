@@ -6,6 +6,7 @@ export interface User {
   email: string;
   role?: string;
   photoUrl?: string;
+  must_change_password: boolean;
 }
 
 export interface ApiResponse {
@@ -14,6 +15,7 @@ export interface ApiResponse {
   token?: string;
   user?: User;
 }
+
 
 // Sunucu yanıtını handle et
 async function handleResponse(res: Response): Promise<any> {
@@ -87,20 +89,46 @@ export async function updateUser(data: Partial<User>): Promise<ApiResponse> {
 export async function addTeamMember(data: {
   name: string;
   email: string;
-  password: string;
   role: "assistant" | "sekreter";
 }): Promise<ApiResponse> {
   const token = localStorage.getItem("token");
   if (!token) throw new Error("Token bulunamadı");
 
-  const res = await fetch(`http://localhost:8000/api/doctors/team/add`, {
+  const res = await fetch("http://localhost:8000/api/users/create-staff", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "token-header": `Bearer ${token}`,
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      name: data.name,
+      email: data.email,
+      role: data.role,
+    }),
   });
 
   return handleResponse(res);
+}
+
+// diğer exportlar varsa onları bozma
+export async function changePasswordFirstLogin(newPassword: string, token: string) {
+  try {
+    const res = await fetch("http://localhost:8000/api/users/change-password-first-login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "token-header": `Bearer ${token}`
+      },
+      body: JSON.stringify({ new_password: newPassword })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      return { error: err.detail || "Hata oluştu" };
+    }
+
+    return await res.json();
+  } catch (err) {
+    return { error: "İstek başarısız" };
+  }
 }

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum
+from sqlalchemy import Column, Integer, String, Enum, Boolean
 from app.database import Base
 from enum import Enum as PyEnum
 
@@ -22,3 +22,5 @@ class User(Base):
     diploma_number = Column(String, nullable=True)      # sadece doktor için
     workplace = Column(String, nullable=True)           # doktorun görev yaptığı yer
     specialization = Column(String, nullable=True)      # doktorun uzmanlık alanı
+    must_change_password = Column(Boolean, default=False)
+    

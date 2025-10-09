@@ -1,4 +1,5 @@
 # app/services/user_service.py
+import secrets
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin
@@ -8,6 +9,8 @@ from app.config import ACCESS_TOKEN_EXPIRE_MINUTES
 from fastapi import Header, HTTPException, status, Depends
 from app.utils.auth import verify_token
 from app.database import get_db
+from app.utils.email_service import send_email
+
 
 
 def register_user(db: Session, user_data: UserCreate):
@@ -42,7 +45,14 @@ def login_user(db: Session, login_data: UserLogin):
         data={"sub": user.email}, 
         expires_delta=access_token_expires
     )
-    return {"token": token, "user": user}
+    return { "token": token,
+    "user": {
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "must_change_password": user.must_change_password}
+        }
 
 def get_current_user(
     token_header: str = Header(..., alias="token-header"),
@@ -102,3 +112,34 @@ def get_current_user(
         )
 
     return user
+
+def create_staff_user(db: Session, name: str, email: str, role: str):
+    # 1️⃣ Mevcut mu kontrol
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        return {"error": "Bu email zaten kayıtlı."}
+
+    # 2️⃣ Random şifre oluştur
+    temp_password = secrets.token_urlsafe(8)
+    hashed_pw = hash_password(temp_password)
+
+    # 3️⃣ Kullanıcı oluştur
+    new_user = User(
+        name=name,
+        email=email,
+        password=hashed_pw,
+        role=role,
+        must_change_password=True
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    # 4️⃣ Mail gönder
+    send_email(
+        to_email=email,
+        subject="Kişisel Sağlık Asistanı Hesabınız Oluşturuldu",
+        body=f"Merhaba {name},\n\nHesabınız oluşturuldu.\nGeçici şifreniz: {temp_password}\nİlk girişte şifrenizi değiştiriniz.\n\nSağlıklı günler!"
+    )
+
+    return new_user

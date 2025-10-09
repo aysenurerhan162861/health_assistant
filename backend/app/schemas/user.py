@@ -2,6 +2,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from app.models.user import UserRole
+from enum import Enum
 
 class UserCreate(BaseModel):
     name: str
@@ -36,3 +37,14 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None  # opsiyonel
+
+class UserRole(str, Enum):
+    DOCTOR = "doctor"
+    ASSISTANT = "assistant"
+    SECRETARY = "secretary"
+
+class StaffCreate(BaseModel):
+    name: str
+    email: EmailStr
+    role: UserRole
+    

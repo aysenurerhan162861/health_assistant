@@ -1,12 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.schemas.user import UserCreate, UserLogin, UserUpdate, UserOut
-from app.services.user_service import register_user, login_user, get_current_user
+from app.schemas.user import UserCreate, UserLogin, UserUpdate, UserOut, StaffCreate
+from app.services.user_service import register_user, login_user, get_current_user, hash_password
 from app.database import get_db
 from app.models.user import User
-
+from app.services.user_service import create_staff_user
+from app.services.user_service import get_current_user
+from pydantic import BaseModel
 
 router = APIRouter()
+
+class ChangePasswordRequest(BaseModel):
+    new_password: str
 
 @router.post("/register")
 def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -51,3 +56,42 @@ def update_user(
     db.commit()
     db.refresh(user)
     return user
+
+@router.post("/create-staff", response_model=UserOut)
+def create_staff(
+    staff: StaffCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "doctor":
+        raise HTTPException(status_code=403, detail="Sadece doktor kullanıcı ekleyebilir.")
+
+    result = create_staff_user(
+        db=db,
+        name=staff.name,
+        email=staff.email,
+        role=staff.role
+    )
+
+    # ✅ Hata kontrolünü güvenli hale getir
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    # ✅ Eğer result bir User nesnesiyse burası sorunsuz çalışır
+    return result
+
+@router.post("/change-password-first-login")
+def change_password_first_login(
+    data: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.must_change_password:
+        raise HTTPException(status_code=400, detail="Şifre değişikliği gerek yok.")
+
+    current_user.password = hash_password(data.new_password)
+    current_user.must_change_password = False
+    db.commit()
+    db.refresh(current_user)
+
+    return {"message": "Şifre başarıyla değiştirildi"}

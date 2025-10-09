@@ -33,7 +33,11 @@ export default function LoginForm() {
         localStorage.setItem("token", res.token);
         localStorage.setItem("user", JSON.stringify(res.user));
         setMessage("Giriş başarılı!");
-        setTimeout(() => router.push("/dashboard"), 500);
+        if (res.user.must_change_password) {
+        router.push("/change-password"); // yeni şifre sayfasına yönlendir
+      } else {
+        setTimeout(() => router.push("/dashboard"), 500); // normal yönlendirme
+      }
       }
     } catch (err) {
       setMessage("Giriş başarısız!");
