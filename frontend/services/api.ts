@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8000/api/users";
+const API_URL = "http://localhost:8000/api/users"
 
 export interface User {
   id: number;
@@ -7,6 +7,27 @@ export interface User {
   role?: string;
   photoUrl?: string;
   must_change_password: boolean;
+
+  // form alanları
+  phone?: string;
+  birth_date?: string;
+  birthDate?: string;
+  gender?: string;
+  city?: string;
+  district?: string;
+  neighborhood?: string;
+  blood_type?: string;
+  bloodType?: string;
+  chronic_diseases?: string;
+  chronicDiseases?: string;
+  allergies?: string;
+  branch?: string;
+  experience?: number;
+  institution?: string;
+  diploma_no?: string;
+  diplomaNo?: string;
+  certifications?: string | string[];
+  about?: string;
 }
 
 export interface ApiResponse {
@@ -15,7 +36,6 @@ export interface ApiResponse {
   token?: string;
   user?: User;
 }
-
 
 // Sunucu yanıtını handle et
 async function handleResponse(res: Response): Promise<any> {
@@ -68,10 +88,37 @@ export async function getMe(): Promise<User> {
   return await res.json();
 }
 
-// Kullanıcı bilgilerini güncelle
+// 🧩 Kullanıcı bilgilerini güncelle
 export async function updateUser(data: Partial<User>): Promise<ApiResponse> {
   const token = localStorage.getItem("token");
   if (!token) throw new Error("Token bulunamadı");
+
+  // FastAPI'nin beklediği snake_case formatına dönüştür
+  const payload = {
+  name: data.name,
+  email: data.email,
+  phone: data.phone,
+  birth_date: data.birthDate
+    ? new Date(data.birthDate).toISOString().split("T")[0]
+    : data.birth_date,
+  gender: data.gender,
+  city: data.city,
+  district: data.district,
+  neighborhood: data.neighborhood,
+  blood_type: data.bloodType || data.blood_type,
+  chronic_diseases: data.chronicDiseases || data.chronic_diseases,
+  allergies: data.allergies,
+  branch: data.branch,
+  experience: data.experience,
+  institution: data.institution,
+  diploma_no: data.diplomaNo,
+  certifications:
+    Array.isArray(data.certifications)
+      ? data.certifications.join(",")
+      : data.certifications, // string ise olduğu gibi bırak
+  about: data.about,
+  photo_url: data.photoUrl,
+};
 
   const res = await fetch(`${API_URL}/update`, {
     method: "POST",
@@ -79,7 +126,7 @@ export async function updateUser(data: Partial<User>): Promise<ApiResponse> {
       "Content-Type": "application/json",
       "token-header": `Bearer ${token}`,
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
 
   return handleResponse(res);
@@ -94,7 +141,7 @@ export async function addTeamMember(data: {
   const token = localStorage.getItem("token");
   if (!token) throw new Error("Token bulunamadı");
 
-  const res = await fetch("http://localhost:8000/api/users/create-staff", {
+  const res = await fetch(`${API_URL}/create-staff`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -110,16 +157,16 @@ export async function addTeamMember(data: {
   return handleResponse(res);
 }
 
-// diğer exportlar varsa onları bozma
+// İlk girişte şifre değiştirme
 export async function changePasswordFirstLogin(newPassword: string, token: string) {
   try {
-    const res = await fetch("http://localhost:8000/api/users/change-password-first-login", {
+    const res = await fetch(`${API_URL}/change-password-first-login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "token-header": `Bearer ${token}`
+        "token-header": `Bearer ${token}`,
       },
-      body: JSON.stringify({ new_password: newPassword })
+      body: JSON.stringify({ new_password: newPassword }),
     });
 
     if (!res.ok) {
@@ -132,3 +179,19 @@ export async function changePasswordFirstLogin(newPassword: string, token: strin
     return { error: "İstek başarısız" };
   }
 }
+export async function getMyStaff(): Promise<User[]> {
+  const token = localStorage.getItem("token");
+  if (!token) throw new Error("Token bulunamadı");
+
+  const res = await fetch("http://localhost:8000/api/doctors/my-staff", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "token-header": `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) throw new Error("Alt kullanıcılar alınamadı");
+  return await res.json();
+}
+

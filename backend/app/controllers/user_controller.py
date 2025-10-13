@@ -47,12 +47,11 @@ def update_user(
     user = db.query(User).filter(User.id == current_user.id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
-    
-    if data.name:
-        user.name = data.name
-    if data.email:
-        user.email = data.email
-    
+
+    # dinamik olarak gelen verileri güncelle
+    for field, value in data.dict(exclude_unset=True).items():
+        setattr(user, field, value)
+
     db.commit()
     db.refresh(user)
     return user
@@ -70,7 +69,8 @@ def create_staff(
         db=db,
         name=staff.name,
         email=staff.email,
-        role=staff.role
+        role=staff.role,
+        parent_id=current_user.id
     )
 
     # ✅ Hata kontrolünü güvenli hale getir
@@ -95,3 +95,4 @@ def change_password_first_login(
     db.refresh(current_user)
 
     return {"message": "Şifre başarıyla değiştirildi"}
+

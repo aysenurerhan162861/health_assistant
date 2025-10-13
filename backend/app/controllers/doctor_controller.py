@@ -20,3 +20,14 @@ def add_team_member(user_in: UserCreate, current_user: User = Depends(get_curren
     if current_user.role.lower() != "doctor":
         raise HTTPException(status_code=403, detail="Not authorized")
     return add_team_member_service(db, current_user, user_in)
+
+@router.get("/my-staff", response_model=List[UserOut])
+def get_my_staff(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "doctor":
+        raise HTTPException(status_code=403, detail="Sadece doktorlar bu listeyi görebilir.")
+
+    staff_members = db.query(User).filter(User.parent_id == current_user.id).all()
+    return staff_members

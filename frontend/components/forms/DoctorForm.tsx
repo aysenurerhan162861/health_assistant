@@ -11,9 +11,13 @@ import {
   MenuItem,
   Snackbar,
   Alert,
+  Divider,
+  Stack,
+  Tooltip,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import { User, addTeamMember, updateUser } from "../../services/api";
 
 interface Props {
@@ -29,14 +33,14 @@ interface TeamData {
 
 const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
   const [doctor, setDoctor] = useState({
-    name: user.name || "",
-    email: user.email || "",
-    branch: "Nöroloji",
-    experience: 5,
-    institution: "Karadeniz Hastanesi",
-    diplomaNo: "123456789",
-    certifications: ["Beyin Cerrahisi"],
-    about: "10 yıllık deneyimli nöroloji uzmanı",
+    name: "",
+    email: "",
+    branch: "",
+    experience: 0,
+    institution: "",
+    diplomaNo: "",
+    certifications: [] as string[],
+    about: "",
     photoUrl: "",
   });
 
@@ -46,30 +50,67 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
     role: "assistant",
   });
 
+  const [staffMembers, setStaffMembers] = useState<User[]>([]);
   const [message, setMessage] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
+  const primaryColor = "#0a2d57";
+  const lightBg = "#f8faff";
+
   useEffect(() => {
-    setDoctor((prev) => ({
-      ...prev,
+    setDoctor({
       name: user.name || "",
       email: user.email || "",
-    }));
+      branch: user.branch || "",
+      experience: user.experience || 0,
+      institution: user.institution || "",
+      diplomaNo: user.diploma_no || "",
+      certifications: Array.isArray(user.certifications)
+        ? user.certifications
+        : typeof user.certifications === "string"
+        ? user.certifications.split(",")
+        : [],
+      about: user.about || "",
+      photoUrl: user.photoUrl || "",
+    });
+
+    // Alt kullanıcıları çek
+  const fetchStaff = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Token bulunamadı");
+
+      const res = await fetch("http://localhost:8000/api/doctors/my-staff", {
+        headers: {
+          "token-header": `Bearer ${token}`, // burası Authorization değil, token-header
+        },
+      });
+
+      if (!res.ok) throw new Error("Alt kullanıcılar alınamadı");
+
+      const data = await res.json();
+      setStaffMembers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Alt kullanıcılar alınamadı", err);
+      setMessage("Alt kullanıcılar alınamadı ❌");
+      setSnackbarOpen(true);
+    }
+  };
+    fetchStaff();
   }, [user]);
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: any) =>
     setDoctor((prev) => ({ ...prev, [field]: value }));
-  };
 
   const handleSave = async () => {
     try {
       if (!user.id) return;
       const res = await updateUser({ id: user.id, ...doctor });
-      setMessage("Bilgiler güncellendi!");
+      setMessage("Bilgiler başarıyla güncellendi! ✅");
       setSnackbarOpen(true);
       if (res.user) setUser(res.user);
     } catch {
-      setMessage("Güncelleme başarısız!");
+      setMessage("Bilgiler güncellenirken bir hata oluştu ❌");
       setSnackbarOpen(true);
     }
   };
@@ -82,243 +123,300 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
   const handleTeamSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addTeamMember({
-        name: teamData.name,
-        email: teamData.email,
-        role: teamData.role,
-      });
+      await addTeamMember(teamData);
       setMessage("Alt kullanıcı eklendi ve mail gönderildi! ✅");
       setTeamData({ name: "", email: "", role: "assistant" });
       setSnackbarOpen(true);
+
+      // Listeyi güncelle
+      const token = localStorage.getItem("token");
+      const res = await fetch("http://localhost:8000/api/doctors/my-staff", {
+        headers: {
+          "token-header": `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      setStaffMembers(Array.isArray(data) ? data : []);
     } catch {
-      setMessage("Alt kullanıcı ekleme başarısız! ❌");
+      setMessage("Alt kullanıcı eklenemedi ❌");
       setSnackbarOpen(true);
     }
   };
 
-  const primaryColor = "#0a2d57";
-  const lightBlue = "#d6e4ff";
-
   return (
-    <Box sx={{ p: 3, bgcolor: "#f0f4ff", minHeight: "100vh" }}>
-      {/* Flex container: Sol + Sağ */}
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: { xs: "column", md: "row" },
-          gap: 4,
-        }}
+    <Box sx={{ bgcolor: lightBg, p: 4, minHeight: "100vh" }}>
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={4}
+        alignItems="flex-start"
       >
-        {/* Sol kolon */}
-        <Box
+        {/* Sol Panel */}
+        <Paper
+          elevation={4}
           sx={{
+            p: 4,
+            borderRadius: 4,
             flex: { xs: "1 1 100%", md: "0 0 30%" },
             textAlign: "center",
+            bgcolor: "#ffffff",
           }}
         >
-          <Paper
+          <Avatar
+            src={doctor.photoUrl}
             sx={{
-              p: 3,
-              borderRadius: 3,
-              boxShadow: 3,
-              bgcolor: lightBlue,
+              width: 130,
+              height: 130,
+              mx: "auto",
+              mb: 2,
+              border: `3px solid ${primaryColor}`,
+            }}
+          />
+          <Typography
+            variant="h6"
+            sx={{ color: primaryColor, fontWeight: 700, mb: 0.5 }}
+          >
+            {doctor.name || "Ad Soyad"}
+          </Typography>
+          <Typography
+            variant="body2"
+            color="textSecondary"
+            sx={{ mb: 2, fontStyle: "italic" }}
+          >
+            {doctor.branch || "Branş bilgisi yok"}
+          </Typography>
+
+          <Button
+            variant="contained"
+            fullWidth
+            startIcon={<UploadFileIcon />}
+            sx={{
+              bgcolor: primaryColor,
+              color: "white",
+              fontWeight: "bold",
+              textTransform: "none",
+              "&:hover": { bgcolor: "#071d3c" },
             }}
           >
-            <Avatar
-              src={doctor.photoUrl}
-              sx={{ width: 120, height: 120, mb: 2, mx: "auto", border: `2px solid ${primaryColor}` }}
-            />
-            <Typography variant="h6" sx={{ color: primaryColor, fontWeight: "bold" }}>
-              {doctor.name}
-            </Typography>
-            <Typography variant="subtitle2" color={primaryColor} mb={2}>
-              {doctor.branch}
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<UploadFileIcon />}
-              sx={{
-                bgcolor: primaryColor,
-                "&:hover": { bgcolor: "#082147" },
-                color: "white",
-              }}
+            Fotoğraf Yükle
+          </Button>
+
+          <Divider sx={{ my: 3 }} />
+          <Typography
+            variant="subtitle2"
+            sx={{ color: primaryColor, fontWeight: 600 }}
+          >
+            {doctor.institution || "Kurumu Belirtilmemiş"}
+          </Typography>
+        </Paper>
+
+        {/* Sağ Panel */}
+        <Box sx={{ flex: { xs: "1", md: "0 0 70%" } }}>
+          {/* Bilgiler */}
+          <Paper sx={{ p: 4, borderRadius: 4, mb: 4 }} elevation={4}>
+            <Typography
+              variant="h6"
+              sx={{ color: primaryColor, fontWeight: "bold", mb: 3 }}
             >
-              Fotoğraf Yükle
-            </Button>
-          </Paper>
-        </Box>
-
-        {/* Sağ kolon */}
-        <Box
-          sx={{
-            flex: { xs: "1 1 100%", md: "0 0 70%" },
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-          }}
-        >
-          {/* Kendi Bilgileriniz */}
-          <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 3, bgcolor: "white" }}>
-            <Typography variant="subtitle1" mb={2} sx={{ color: primaryColor, fontWeight: "bold" }}>
-              Kendi Bilgileriniz
+              Kişisel Bilgiler
             </Typography>
 
-            <TextField
-              label="Ad Soyad"
-              value={doctor.name}
-              onChange={(e) => handleChange("name", e.target.value)}
-              fullWidth
-              sx={{ mb: 2 }}
-              InputProps={{
-                endAdornment: (
-                  <IconButton size="small">
-                    <EditIcon color="primary" />
+            <Stack spacing={2}>
+              <TextField
+                label="Ad Soyad"
+                value={doctor.name}
+                onChange={(e) => handleChange("name", e.target.value)}
+                fullWidth
+              />
+              <TextField
+                label="E-posta"
+                value={doctor.email}
+                onChange={(e) => handleChange("email", e.target.value)}
+                fullWidth
+              />
+              <TextField
+                label="Branş"
+                value={doctor.branch}
+                onChange={(e) => handleChange("branch", e.target.value)}
+                fullWidth
+              />
+              <TextField
+                label="Deneyim (yıl)"
+                type="number"
+                value={doctor.experience}
+                onChange={(e) => handleChange("experience", e.target.value)}
+                fullWidth
+              />
+              <TextField
+                label="Çalıştığı Kurum"
+                value={doctor.institution}
+                onChange={(e) => handleChange("institution", e.target.value)}
+                fullWidth
+              />
+              <TextField
+                label="Diploma No"
+                value={doctor.diplomaNo}
+                onChange={(e) => handleChange("diplomaNo", e.target.value)}
+                fullWidth
+              />
+
+              {/* Uzmanlık Belgeleri */}
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ fontWeight: 600, color: primaryColor, mb: 1 }}
+                >
+                  Uzmanlık Belgeleri
+                </Typography>
+                {doctor.certifications.map((cert, idx) => (
+                  <Chip
+                    key={idx}
+                    label={cert}
+                    onDelete={() =>
+                      handleChange(
+                        "certifications",
+                        doctor.certifications.filter((c) => c !== cert)
+                      )
+                    }
+                    sx={{
+                      mr: 1,
+                      mb: 1,
+                      bgcolor: "#eaf1ff",
+                      color: primaryColor,
+                      fontWeight: 500,
+                    }}
+                  />
+                ))}
+                <Tooltip title="Yeni belge ekle">
+                  <IconButton
+                    size="small"
+                    onClick={() =>
+                      handleChange("certifications", [
+                        ...doctor.certifications,
+                        "Yeni Belge",
+                      ])
+                    }
+                  >
+                    <AddCircleOutlineIcon color="primary" />
                   </IconButton>
-                ),
-              }}
-            />
+                </Tooltip>
+              </Box>
 
-            <TextField
-              label="Email"
-              value={doctor.email}
-              onChange={(e) => handleChange("email", e.target.value)}
-              fullWidth
-              sx={{ mb: 2 }}
-              InputProps={{
-                endAdornment: (
-                  <IconButton size="small">
-                    <EditIcon color="primary" />
-                  </IconButton>
-                ),
-              }}
-            />
+              <TextField
+                label="Hakkında"
+                value={doctor.about}
+                onChange={(e) => handleChange("about", e.target.value)}
+                multiline
+                rows={3}
+                fullWidth
+              />
 
-            <TextField
-              label="Branş"
-              value={doctor.branch}
-              onChange={(e) => handleChange("branch", e.target.value)}
-              fullWidth
-              sx={{ mb: 2 }}
-            />
-
-            <TextField
-              label="Deneyim (Yıl)"
-              type="number"
-              value={doctor.experience}
-              onChange={(e) => handleChange("experience", e.target.value)}
-              fullWidth
-              sx={{ mb: 2 }}
-            />
-
-            <TextField
-              label="Çalıştığı Kurum"
-              value={doctor.institution}
-              onChange={(e) => handleChange("institution", e.target.value)}
-              fullWidth
-              sx={{ mb: 2 }}
-            />
-
-            <TextField
-              label="Diploma No"
-              value={doctor.diplomaNo}
-              onChange={(e) => handleChange("diplomaNo", e.target.value)}
-              fullWidth
-              sx={{ mb: 2 }}
-            />
-
-            <Box mb={2}>
-              <Typography variant="subtitle2" mb={1} sx={{ fontWeight: "bold" }}>
-                Uzmanlık Belgeleri
-              </Typography>
-              {doctor.certifications.map((cert, idx) => (
-                <Chip
-                  key={idx}
-                  label={cert}
-                  onDelete={() =>
-                    handleChange(
-                      "certifications",
-                      doctor.certifications.filter((c) => c !== cert)
-                    )
-                  }
-                  sx={{ mr: 1, mb: 1, bgcolor: lightBlue, color: primaryColor }}
-                />
-              ))}
               <Button
-                size="small"
-                variant="outlined"
-                sx={{ ml: 1, borderColor: primaryColor, color: primaryColor }}
-                onClick={() =>
-                  handleChange("certifications", [
-                    ...doctor.certifications,
-                    "Yeni Belge",
-                  ])
-                }
+                variant="contained"
+                sx={{
+                  bgcolor: primaryColor,
+                  color: "white",
+                  fontWeight: "bold",
+                  alignSelf: "flex-end",
+                  width: "200px",
+                  "&:hover": { bgcolor: "#071d3c" },
+                }}
+                onClick={handleSave}
               >
-                + Ekle
+                Kaydet
               </Button>
-            </Box>
-
-            <TextField
-              label="Hakkında"
-              value={doctor.about}
-              onChange={(e) => handleChange("about", e.target.value)}
-              multiline
-              rows={3}
-              fullWidth
-              sx={{ mb: 2 }}
-            />
-
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleSave}
-              sx={{ bgcolor: primaryColor, "&:hover": { bgcolor: "#082147" } }}
-            >
-              Değişiklikleri Kaydet
-            </Button>
+            </Stack>
           </Paper>
 
-          {/* Alt kullanıcı ekleme */}
-          <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 3, bgcolor: "white" }}>
-            <Typography variant="subtitle1" mb={2} sx={{ color: primaryColor, fontWeight: "bold" }}>
+          {/* Alt Kullanıcı Ekleme */}
+          <Paper sx={{ p: 4, borderRadius: 4, mb: 4 }} elevation={4}>
+            <Typography
+              variant="h6"
+              sx={{ color: primaryColor, fontWeight: "bold", mb: 3 }}
+            >
               Alt Kullanıcı Ekle
             </Typography>
             <Box component="form" onSubmit={handleTeamSubmit}>
-              <TextField
-                label="Ad Soyad"
-                name="name"
-                value={teamData.name}
-                onChange={handleTeamChange}
-                fullWidth
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                label="Email"
-                name="email"
-                value={teamData.email}
-                onChange={handleTeamChange}
-                fullWidth
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                select
-                label="Rol"
-                name="role"
-                value={teamData.role}
-                onChange={handleTeamChange}
-                fullWidth
-                sx={{ mb: 2 }}
-              >
-                <MenuItem value="assistant">Asistan</MenuItem>
-                <MenuItem value="sekreter">Sekreter</MenuItem>
-              </TextField>
-              <Button type="submit" variant="contained" sx={{ bgcolor: primaryColor, "&:hover": { bgcolor: "#082147" } }}>
-                Ekle
-              </Button>
+              <Stack spacing={2}>
+                <TextField
+                  label="Ad Soyad"
+                  name="name"
+                  value={teamData.name}
+                  onChange={handleTeamChange}
+                  fullWidth
+                />
+                <TextField
+                  label="E-posta"
+                  name="email"
+                  value={teamData.email}
+                  onChange={handleTeamChange}
+                  fullWidth
+                />
+                <TextField
+                  select
+                  label="Rol"
+                  name="role"
+                  value={teamData.role}
+                  onChange={handleTeamChange}
+                  fullWidth
+                >
+                  <MenuItem value="assistant">Asistan</MenuItem>
+                  <MenuItem value="sekreter">Sekreter</MenuItem>
+                </TextField>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
+                  sx={{
+                    bgcolor: primaryColor,
+                    color: "white",
+                    fontWeight: "bold",
+                    py: 1.2,
+                    "&:hover": { bgcolor: "#071d3c" },
+                  }}
+                >
+                  Alt Kullanıcı Ekle
+                </Button>
+              </Stack>
             </Box>
           </Paper>
+
+          {/* Alt Kullanıcı Listesi */}
+          <Paper sx={{ p: 4, borderRadius: 4 }} elevation={4}>
+            <Typography
+              variant="h6"
+              sx={{ color: primaryColor, fontWeight: "bold", mb: 3 }}
+            >
+              Alt Kullanıcılar
+            </Typography>
+            {staffMembers.length === 0 ? (
+              <Typography>Henüz alt kullanıcı eklenmemiş.</Typography>
+            ) : (
+              <Stack spacing={1}>
+                {staffMembers.map((staff) => (
+                  <Paper
+                    key={staff.id}
+                    sx={{
+                      p: 2,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      bgcolor: "#f1f5ff",
+                    }}
+                  >
+                    <Box>
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {staff.name}
+                      </Typography>
+                      <Typography variant="body2">{staff.email}</Typography>
+                      <Typography variant="body2">{staff.role}</Typography>
+                    </Box>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
+          </Paper>
         </Box>
-      </Box>
+      </Stack>
 
       {/* Snackbar */}
       <Snackbar

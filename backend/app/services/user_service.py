@@ -113,7 +113,7 @@ def get_current_user(
 
     return user
 
-def create_staff_user(db: Session, name: str, email: str, role: str):
+def create_staff_user(db: Session, name: str, email: str, role: str, parent_id: int):
     # 1️⃣ Mevcut mu kontrol
     existing = db.query(User).filter(User.email == email).first()
     if existing:
@@ -129,7 +129,8 @@ def create_staff_user(db: Session, name: str, email: str, role: str):
         email=email,
         password=hashed_pw,
         role=role,
-        must_change_password=True
+        must_change_password=True,
+        parent_id=parent_id,  # burayı düzelttik
     )
     db.add(new_user)
     db.commit()

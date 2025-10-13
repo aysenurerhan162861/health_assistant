@@ -1,6 +1,11 @@
-from sqlalchemy import Column, Integer, String, Enum, Boolean
+from sqlalchemy import Column, Integer, String, Enum, Boolean, Text, ForeignKey
 from app.database import Base
 from enum import Enum as PyEnum
+from sqlalchemy.types import Date
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+
+Base = declarative_base()
 
 
 class UserRole(str, PyEnum):
@@ -23,4 +28,26 @@ class User(Base):
     workplace = Column(String, nullable=True)           # doktorun görev yaptığı yer
     specialization = Column(String, nullable=True)      # doktorun uzmanlık alanı
     must_change_password = Column(Boolean, default=False)
+
+    phone = Column(String, nullable=True)
+    birth_date = Column(Date, nullable=True)
+    gender = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    district = Column(String, nullable=True)
+    neighborhood = Column(String, nullable=True)
+    blood_type = Column(String, nullable=True)
+    chronic_diseases = Column(String, nullable=True)
+    allergies = Column(String, nullable=True)
+    photo_url = Column(String, nullable=True)
+
+    branch = Column(String)
+    experience = Column(Integer)
+    institution = Column(String)
+    diploma_no = Column(String)
+    certifications = Column(Text)  # JSON veya comma-separated string
+    about = Column(Text)
+
+    parent_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    parent = relationship("User", remote_side=[id])
+
     
