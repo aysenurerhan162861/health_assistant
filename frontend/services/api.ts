@@ -195,3 +195,17 @@ export async function getMyStaff(): Promise<User[]> {
   return await res.json();
 }
 
+export async function removeTeamMember(memberId: number): Promise<ApiResponse> {
+  const token = localStorage.getItem("token");
+  if (!token) throw new Error("Token bulunamadı");
+
+  const res = await fetch(`http://localhost:8000/api/doctors/team/remove/${memberId}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      "token-header": `Bearer ${token}`,
+    },
+  });
+
+  return handleResponse(res);
+}

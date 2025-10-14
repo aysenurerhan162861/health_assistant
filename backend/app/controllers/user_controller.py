@@ -7,6 +7,7 @@ from app.models.user import User
 from app.services.user_service import create_staff_user
 from app.services.user_service import get_current_user
 from pydantic import BaseModel
+from app.models.doctor_team import DoctorTeam
 
 router = APIRouter()
 

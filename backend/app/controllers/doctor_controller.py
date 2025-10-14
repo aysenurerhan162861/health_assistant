@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.orm import Session
 from typing import List
 from app.schemas.user import UserCreate, UserOut
-from app.services.doctor_service import get_doctor_patients_service, add_team_member_service
+from app.services.doctor_service import get_doctor_patients_service, add_team_member_service, delete_team_member_service
 from app.database import get_db
 from app.services.user_service import get_current_user
 from app.models.user import User
+from app.models.doctor_team import DoctorTeam
 
 router = APIRouter()
 
@@ -29,5 +30,32 @@ def get_my_staff(
     if current_user.role != "doctor":
         raise HTTPException(status_code=403, detail="Sadece doktorlar bu listeyi görebilir.")
 
-    staff_members = db.query(User).filter(User.parent_id == current_user.id).all()
+    staff_members = (
+        db.query(User)
+        .join(DoctorTeam, DoctorTeam.member_id == User.id)
+        .filter(DoctorTeam.doctor_id == current_user.id)
+        .all()
+    )
     return staff_members
+
+@router.delete("/team/remove/{member_id}")
+def remove_team_member(
+    member_id: int = Path(..., description="Silinecek alt kullanıcının ID'si"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    # current_user.id = doctor_id
+    team_members = db.query(DoctorTeam).filter(
+        DoctorTeam.doctor_id == current_user.id,
+        DoctorTeam.member_id == member_id
+    ).all()
+
+    if not team_members:
+        raise HTTPException(status_code=404, detail="Alt kullanıcı bulunamadı veya size bağlı değil")
+
+    # Tüm eşleşen kayıtları sil
+    for member in team_members:
+        db.delete(member)
+    db.commit()
+    return {"message": "Alt kullanıcı(lar) başarıyla silindi"}
+

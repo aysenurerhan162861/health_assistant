@@ -2,6 +2,7 @@
 import secrets
 from sqlalchemy.orm import Session
 from app.models.user import User
+from app.models.doctor_team import DoctorTeam
 from app.schemas.user import UserCreate, UserLogin
 from app.utils.auth import hash_password, verify_password, create_access_token
 from datetime import timedelta
@@ -116,27 +117,61 @@ def get_current_user(
 def create_staff_user(db: Session, name: str, email: str, role: str, parent_id: int):
     # 1️⃣ Mevcut mu kontrol
     existing = db.query(User).filter(User.email == email).first()
-    if existing:
-        return {"error": "Bu email zaten kayıtlı."}
 
-    # 2️⃣ Random şifre oluştur
+    if existing:
+        # Eğer zaten doctor_team’de yoksa ekle
+        team_entry = db.query(DoctorTeam).filter(
+            DoctorTeam.doctor_id == parent_id,
+            DoctorTeam.member_id == existing.id
+        ).first()
+
+        if team_entry:
+            return {"error": "Bu kullanıcı zaten ekli."}
+
+        # DoctorTeam kaydı oluştur
+        new_team_entry = DoctorTeam(
+            doctor_id=parent_id,
+            member_id=existing.id,
+            role=role,
+            permissions={}
+        )
+        db.add(new_team_entry)
+        db.commit()
+        db.refresh(new_team_entry)
+
+        # Mail gönderebilirsin, istersen
+        send_email(
+            to_email=email,
+            subject="Kişisel Sağlık Asistanı Hesabınız Güncellendi",
+            body=f"Merhaba {name},\n\nArtık tekrar alt kullanıcı olarak eklenmiş bulunuyorsunuz.\n\nSağlıklı günler!"
+        )
+        return existing
+
+    # 2️⃣ Yeni kullanıcı oluştur (önceki flow)
     temp_password = secrets.token_urlsafe(8)
     hashed_pw = hash_password(temp_password)
-
-    # 3️⃣ Kullanıcı oluştur
     new_user = User(
         name=name,
         email=email,
         password=hashed_pw,
         role=role,
         must_change_password=True,
-        parent_id=parent_id,  # burayı düzelttik
+        parent_id=parent_id,
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
-    # 4️⃣ Mail gönder
+    team_entry = DoctorTeam(
+        doctor_id=parent_id,
+        member_id=new_user.id,
+        role=new_user.role,
+        permissions={}
+    )
+    db.add(team_entry)
+    db.commit()
+    db.refresh(team_entry)
+
     send_email(
         to_email=email,
         subject="Kişisel Sağlık Asistanı Hesabınız Oluşturuldu",

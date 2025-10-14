@@ -2,10 +2,7 @@ from sqlalchemy import Column, Integer, String, Enum, Boolean, Text, ForeignKey
 from app.database import Base
 from enum import Enum as PyEnum
 from sqlalchemy.types import Date
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-
-Base = declarative_base()
 
 
 class UserRole(str, PyEnum):
