@@ -2,7 +2,6 @@
 import secrets
 from sqlalchemy.orm import Session
 from app.models.user import User
-from app.models.doctor_team import DoctorTeam
 from app.schemas.user import UserCreate, UserLogin
 from app.utils.auth import hash_password, verify_password, create_access_token
 from datetime import timedelta
@@ -11,6 +10,7 @@ from fastapi import Header, HTTPException, status, Depends
 from app.utils.auth import verify_token
 from app.database import get_db
 from app.utils.email_service import send_email
+from app.models.doctor_team import DoctorTeam
 
 
 

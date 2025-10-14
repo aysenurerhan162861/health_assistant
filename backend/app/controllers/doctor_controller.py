@@ -58,4 +58,3 @@ def remove_team_member(
         db.delete(member)
     db.commit()
     return {"message": "Alt kullanıcı(lar) başarıyla silindi"}
-
