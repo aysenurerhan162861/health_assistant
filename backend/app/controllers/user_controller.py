@@ -8,7 +8,6 @@ from app.services.user_service import create_staff_user
 from app.services.user_service import get_current_user
 from pydantic import BaseModel
 
-
 router = APIRouter()
 
 class ChangePasswordRequest(BaseModel):
