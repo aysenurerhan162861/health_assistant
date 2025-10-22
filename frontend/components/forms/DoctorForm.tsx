@@ -20,7 +20,7 @@ import UploadFileIcon from "@mui/icons-material/UploadFile";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { DataGrid, GridColDef, GridRenderCellParams } from "@mui/x-data-grid";
-import { User, addTeamMember, updateUser, getMyStaff, removeTeamMember } from "../../services/api";
+import { User, addTeamMember, updateUser, getMyStaff, removeTeamMember, updateTeamMember } from "../../services/api";
 
 interface Props {
   user: User;
@@ -49,6 +49,8 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
   const [staffMembers, setStaffMembers] = useState<User[]>([]);
   const [showStaffPanel, setShowStaffPanel] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<User | null>(null);
+  const [showEditForm, setShowEditForm] = useState(false);
   const [teamData, setTeamData] = useState<TeamData>({ name: "", email: "", role: "assistant" });
   const [message, setMessage] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -89,7 +91,8 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
     fetchStaff();
   }, [user]);
 
-  const handleChange = (field: string, value: any) => setDoctor((prev) => ({ ...prev, [field]: value }));
+  const handleChange = (field: string, value: any) =>
+    setDoctor((prev) => ({ ...prev, [field]: value }));
 
   const handleSave = async () => {
     try {
@@ -109,10 +112,11 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
     setTeamData({ ...teamData, [name]: value });
   };
 
+  // Yeni alt kullanıcı ekleme
   const handleTeamSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addTeamMember(teamData);
+      await addTeamMember(teamData); // backend default şifre atıyor
       setMessage("Alt kullanıcı eklendi! ✅");
       setSnackbarOpen(true);
       setTeamData({ name: "", email: "", role: "assistant" });
@@ -125,18 +129,62 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
     }
   };
 
+  // Alt kullanıcı silme
   const handleRemoveStaff = async (id: number) => {
     try {
       await removeTeamMember(id);
       setMessage("Alt kullanıcı silindi ✅");
       setSnackbarOpen(true);
-      const updatedStaff = await getMyStaff();
-      setStaffMembers(updatedStaff);
+      setStaffMembers((prev) => prev.filter((s) => s.id !== id));
     } catch {
       setMessage("Silme işlemi başarısız ❌");
       setSnackbarOpen(true);
     }
   };
+
+  // Düzenleme
+  const handleEditClick = (staff: User) => {
+    setSelectedStaff(staff);
+    setTeamData({
+      name: staff.name || "",
+      email: staff.email || "",
+      role: staff.role as "assistant" | "sekreter",
+    });
+    setShowEditForm(true);
+    setShowAddForm(false);
+  };
+
+  // Düzenleme submit (JSON body)
+  const handleEditSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!selectedStaff) return;
+
+  try {
+    // services/api.ts'den updateTeamMember kullanıyoruz
+    const res = await updateTeamMember(selectedStaff.id, teamData);
+
+    if (res.error) {
+      setMessage(res.error);
+      setSnackbarOpen(true);
+      return;
+    }
+
+    // Güncel alt kullanıcıları çek
+    const updatedStaff = await getMyStaff();
+    setStaffMembers(updatedStaff);
+
+    setMessage("Alt kullanıcı güncellendi ✅");
+    setSnackbarOpen(true);
+
+    setShowEditForm(false);
+    setSelectedStaff(null);
+    setTeamData({ name: "", email: "", role: "assistant" });
+  } catch (err) {
+    console.error(err);
+    setMessage("Güncelleme başarısız ❌");
+    setSnackbarOpen(true);
+  }
+};
 
   const columns: GridColDef[] = [
     { field: "name", headerName: "Ad Soyad", flex: 1 },
@@ -148,7 +196,7 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
       flex: 1,
       renderCell: (params: GridRenderCellParams) => (
         <Stack direction="row" spacing={1}>
-          <IconButton color="primary" size="small" onClick={() => alert(`Düzenle: ${params.row.name}`)}>
+          <IconButton color="primary" size="small" onClick={() => handleEditClick(params.row)}>
             <EditIcon />
           </IconButton>
           <IconButton color="error" size="small" onClick={() => handleRemoveStaff(params.row.id)}>
@@ -165,7 +213,13 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
         {/* Sol Panel */}
         <Paper
           elevation={4}
-          sx={{ p: 4, borderRadius: 4, flex: { xs: "1 1 100%", md: "0 0 30%" }, textAlign: "center", bgcolor: "#fff" }}
+          sx={{
+            p: 4,
+            borderRadius: 4,
+            flex: { xs: "1 1 100%", md: "0 0 30%" },
+            textAlign: "center",
+            bgcolor: "#fff",
+          }}
         >
           <Avatar
             src={doctor.photoUrl}
@@ -224,15 +278,15 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
         </Box>
       </Stack>
 
-      {/* Alt Kullanıcı Paneli - Geniş ve Ortalanmış */}
+      {/* Alt Kullanıcı Paneli */}
       {showStaffPanel && (
         <Paper
           elevation={10}
           sx={{
             position: "absolute",
             top: 0,
-            left: "30%", // sidebar %30
-            width: "70%", // sidebar dışında kalan
+            left: "30%",
+            width: "70%",
             height: "100%",
             bgcolor: "#f8faff",
             zIndex: 999,
@@ -254,23 +308,34 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
             variant="contained"
             startIcon={<AddCircleOutlineIcon />}
             sx={{ mb: 2 }}
-            onClick={() => setShowAddForm(!showAddForm)}
+            onClick={() => {
+              setShowAddForm(!showAddForm);
+              setShowEditForm(false);
+              setSelectedStaff(null);
+            }}
           >
             Yeni Kullanıcı Ekle
           </Button>
 
-          {showAddForm && (
+          {(showAddForm || showEditForm) && (
             <Paper sx={{ p: 3, mb: 3 }} elevation={4}>
-              <form onSubmit={handleTeamSubmit}>
+              <form onSubmit={showEditForm ? handleEditSubmit : handleTeamSubmit}>
                 <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                   <TextField label="Ad Soyad" name="name" value={teamData.name} onChange={handleTeamChange} required />
                   <TextField label="E-posta" name="email" value={teamData.email} onChange={handleTeamChange} required />
-                  <TextField label="Rol" name="role" select value={teamData.role} onChange={handleTeamChange} sx={{ minWidth: 120 }}>
+                  <TextField
+                    label="Rol"
+                    name="role"
+                    select
+                    value={teamData.role}
+                    onChange={handleTeamChange}
+                    sx={{ minWidth: 120 }}
+                  >
                     <MenuItem value="assistant">Asistan</MenuItem>
                     <MenuItem value="sekreter">Sekreter</MenuItem>
                   </TextField>
                   <Button type="submit" variant="contained" color="primary">
-                    Ekle
+                    {showEditForm ? "Güncelle" : "Ekle"}
                   </Button>
                 </Stack>
               </form>

@@ -209,3 +209,23 @@ export async function removeTeamMember(memberId: number): Promise<ApiResponse> {
 
   return handleResponse(res);
 }
+
+
+export async function updateTeamMember(
+  memberId: number,
+  data: { name?: string; email?: string; role?: "assistant" | "sekreter" }
+): Promise<ApiResponse> {
+  const token = localStorage.getItem("token");
+  if (!token) throw new Error("Token bulunamadı");
+
+  const res = await fetch(`http://localhost:8000/api/doctors/team/update/${memberId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "token-header": `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  return handleResponse(res);
+}

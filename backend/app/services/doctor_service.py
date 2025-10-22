@@ -52,3 +52,27 @@ def delete_team_member_service(db: Session, doctor: User, member_id: int):
     db.commit()
 
     return {"message": "Alt kullanıcı başarıyla silindi"}
+
+def update_team_member_service(db: Session, doctor: User, member_id: int, user_in: UserCreate):
+    # Alt kullanıcıyı bul
+    user = db.query(User).filter(User.id == member_id).first()
+    if not user:
+        raise ValueError("Alt kullanıcı bulunamadı")
+
+    # Doktora bağlı mı kontrol et
+    team_entry = db.query(DoctorTeam).filter(
+        DoctorTeam.doctor_id == doctor.id,
+        DoctorTeam.member_id == member_id
+    ).first()
+    if not team_entry:
+        raise ValueError("Bu kullanıcı size bağlı değil")
+
+    # Alanları güncelle
+    user.name = user_in.name
+    user.email = user_in.email
+    user.role = user_in.role.value  # Enum kullanıyorsa
+    # gerekirse diğer alanlar eklenebilir
+
+    db.commit()
+    db.refresh(user)
+    return user

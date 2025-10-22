@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Body
 from sqlalchemy.orm import Session
 from typing import List
-from app.schemas.user import UserCreate, UserOut
-from app.services.doctor_service import get_doctor_patients_service, add_team_member_service, delete_team_member_service
+from app.schemas.user import UserCreate, UserOut, StaffCreate
+from app.services.doctor_service import get_doctor_patients_service, add_team_member_service, delete_team_member_service, update_team_member_service
 from app.database import get_db
 from app.services.user_service import get_current_user
 from app.models.user import User
@@ -58,3 +58,20 @@ def remove_team_member(
         db.delete(member)
     db.commit()
     return {"message": "Alt kullanıcı(lar) başarıyla silindi"}
+
+@router.put("/team/update/{member_id}", response_model=UserOut)
+def update_team_member(
+    member_id: int = Path(..., description="Güncellenecek alt kullanıcının ID'si"),
+    user_in: StaffCreate = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role.lower() != "doctor":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    try:
+        updated_user = update_team_member_service(db, current_user, member_id, user_in)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return updated_user
