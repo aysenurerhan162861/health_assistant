@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Path, Body
+from fastapi import APIRouter, Depends, HTTPException, Path, Body, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.schemas.user import UserCreate, UserOut, StaffCreate
@@ -7,6 +7,7 @@ from app.database import get_db
 from app.services.user_service import get_current_user
 from app.models.user import User
 from app.models.doctor_team import DoctorTeam
+from app.services.doctor_service import resend_staff_email
 
 router = APIRouter()
 
@@ -75,3 +76,17 @@ def update_team_member(
         raise HTTPException(status_code=404, detail=str(e))
 
     return updated_user
+
+@router.post("/team/resend-mail/{member_id}")
+def resend_staff_mail(
+    member_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Alt kullanıcıya yeniden bilgilendirme maili gönderir
+    """
+    result = resend_staff_email(db, member_id, current_user.id)
+    if "error" in result:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result["error"])
+    return result

@@ -141,6 +141,8 @@ export async function addTeamMember(data: {
   const token = localStorage.getItem("token");
   if (!token) throw new Error("Token bulunamadı");
 
+  const backendRole = data.role === "sekreter" ? "secretary" : "assistant";
+
   const res = await fetch(`${API_URL}/create-staff`, {
     method: "POST",
     headers: {
@@ -229,3 +231,17 @@ export async function updateTeamMember(
 
   return handleResponse(res);
 }
+
+export const resendStaffMail = async (memberId: number) => {
+  const res = await fetch(`http://localhost:8000/api/doctors/team/resend-mail/${memberId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "token-header": `Bearer ${localStorage.getItem("token")}` },
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Mail gönderilemedi");
+  }
+
+  return res.json();
+};
