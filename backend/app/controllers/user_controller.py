@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body, status
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, UserLogin, UserUpdate, UserOut, StaffCreate
 from app.services.user_service import register_user, login_user, get_current_user, hash_password
@@ -96,3 +96,25 @@ def change_password_first_login(
 
     return {"message": "Şifre başarıyla değiştirildi"}
 
+@router.put("/staff/update/me", response_model=UserOut)
+def update_own_profile(
+    user_in: StaffCreate = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Sadece alt kullanıcı (doctor hariç) kendi profilini güncelleyebilir
+    if current_user.role.lower() == "doctor":
+        raise HTTPException(status_code=403, detail="Doktorlar bu işlemi yapamaz.")
+
+    # Kullanıcıyı bul
+    staff = db.query(User).filter(User.id == current_user.id).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+
+    # Alanları güncelle
+    for key, value in user_in.dict(exclude_unset=True).items():
+        setattr(staff, key, value)
+
+    db.commit()
+    db.refresh(staff)
+    return staff

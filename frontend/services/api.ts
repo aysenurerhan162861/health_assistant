@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8000/api/users"
+export const API_URL = "http://localhost:8000/api/users"
 
 export interface User {
   id: number;
@@ -6,7 +6,7 @@ export interface User {
   email: string;
   role?: string;
   photoUrl?: string;
-  must_change_password: boolean;
+  must_change_password?: boolean;
 
   // form alanları
   phone?: string;

@@ -13,8 +13,6 @@ import {
   Divider,
   Stack,
   IconButton,
-  Chip,
-  Autocomplete,
 } from "@mui/material";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import CloseIcon from "@mui/icons-material/Close";
@@ -22,6 +20,7 @@ import UploadFileIcon from "@mui/icons-material/UploadFile";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { DataGrid, GridColDef, GridRenderCellParams } from "@mui/x-data-grid";
+
 import {
   User,
   addTeamMember,
@@ -31,6 +30,8 @@ import {
   updateTeamMember,
   resendStaffMail,
 } from "../../services/api";
+
+import StaffCardModal from "../staff/StaffCardModal";
 
 interface Props {
   user: User;
@@ -70,6 +71,7 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
 
   const primaryColor = "#0a2d57";
   const lightBg = "#f8faff";
+  const filterOptions = ["name", "email", "role"];
 
   useEffect(() => {
     if (!user) return;
@@ -103,7 +105,8 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
     fetchStaff();
   }, [user]);
 
-  const handleChange = (field: string, value: any) => setDoctor((prev) => ({ ...prev, [field]: value }));
+  const handleChange = (field: string, value: any) =>
+    setDoctor((prev) => ({ ...prev, [field]: value }));
 
   const handleSave = async () => {
     try {
@@ -237,7 +240,6 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
     },
   ];
 
-  const filterOptions = ["name", "email", "role"];
   const filteredStaff = useMemo(() => {
     if (!filterText || selectedFilters.length === 0) return staffMembers;
     return staffMembers.filter((s) =>
@@ -291,40 +293,34 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
           <Button variant="contained" startIcon={<AddCircleOutlineIcon />} sx={{ mb: 2 }} onClick={handleAddClick}>Yeni Kullanıcı Ekle</Button>
 
           {/* Filter & Search */}
-<Stack direction={{ xs: "column", md: "row" }} spacing={2} mb={2}>
-  <TextField
-    select
-    label="Filtre Alanı"
-    size="small"
-    variant="outlined"
-    value={selectedFilters[0]} // ✅ Tek seçimli
-    onChange={(e) => setSelectedFilters([e.target.value])}
-    fullWidth
-    sx={{
-      "& .MuiInputLabel-root": { color: primaryColor },
-      "& .MuiOutlinedInput-root": { bgcolor: "#fff" },
-    }}
-  >
-    {filterOptions.map((option) => (
-      <MenuItem key={option} value={option}>
-        {option.charAt(0).toUpperCase() + option.slice(1)}
-      </MenuItem>
-    ))}
-  </TextField>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2} mb={2}>
+            <TextField
+              select
+              label="Filtre Alanı"
+              size="small"
+              variant="outlined"
+              value={selectedFilters[0]}
+              onChange={(e) => setSelectedFilters([e.target.value])}
+              fullWidth
+              sx={{ "& .MuiInputLabel-root": { color: primaryColor }, "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+            >
+              {filterOptions.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {option.charAt(0).toUpperCase() + option.slice(1)}
+                </MenuItem>
+              ))}
+            </TextField>
 
-  <TextField
-    label="Ara..."
-    variant="outlined"
-    size="small"
-    value={filterText}
-    onChange={(e) => setFilterText(e.target.value)}
-    fullWidth
-    sx={{
-      "& .MuiInputLabel-root": { color: primaryColor },
-      "& .MuiOutlinedInput-root": { bgcolor: "#fff" },
-    }}
-  />
-</Stack>
+            <TextField
+              label="Ara..."
+              variant="outlined"
+              size="small"
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              fullWidth
+              sx={{ "& .MuiInputLabel-root": { color: primaryColor }, "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+            />
+          </Stack>
 
           {/* Add/Edit Form */}
           {activeForm && (
@@ -340,23 +336,19 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
                   <Stack direction="row" spacing={2}>
                     <Button type="submit" variant="contained" color="primary">{activeForm === "edit" ? "Güncelle" : "Ekle"}</Button>
                     {activeForm === "edit" && (
-  <Button
-    variant="outlined"
-    onClick={handleResendMail}
-    disabled={loadingMail}
-    sx={{
-      color: primaryColor,           // yazı rengi
-      borderColor: primaryColor,     // kenar rengi
-      "&:hover": {
-        backgroundColor: primaryColor,
-        color: "#fff",
-        borderColor: primaryColor,
-      },
-    }}
-  >
-    {loadingMail ? "Gönderiliyor..." : "Mail Gönder"}
-  </Button>
-)}
+                      <Button
+                        variant="outlined"
+                        onClick={handleResendMail}
+                        disabled={loadingMail}
+                        sx={{
+                          color: primaryColor,
+                          borderColor: primaryColor,
+                          "&:hover": { backgroundColor: primaryColor, color: "#fff", borderColor: primaryColor },
+                        }}
+                      >
+                        {loadingMail ? "Gönderiliyor..." : "Mail Gönder"}
+                      </Button>
+                    )}
                   </Stack>
                 </Stack>
               </form>
@@ -372,10 +364,14 @@ const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
               autoHeight
               disableRowSelectionOnClick
               pageSizeOptions={[5, 10, 20]}
+              onRowClick={(params) => setSelectedStaff(params.row)}
             />
           </Box>
         </Paper>
       )}
+
+      {/* Staff Modal */}
+      {selectedStaff && <StaffCardModal staff={selectedStaff} onClose={() => setSelectedStaff(null)} />}
 
       <Snackbar open={snackbarOpen} autoHideDuration={4000} onClose={() => setSnackbarOpen(false)}>
         <Alert severity="info" sx={{ width: "100%" }}>{message}</Alert>

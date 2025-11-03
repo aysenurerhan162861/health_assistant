@@ -4,6 +4,7 @@ import Layout from "../../components/layout/Layout";
 import KVKKCard from "../../components/forms/KVKKCard";
 import CitizenForm from "../../components/forms/CitizenForm";
 import DoctorForm from "../../components/forms/DoctorForm";
+import StaffForm from "../../components/forms/StaffForm";
 import { getMe, User } from "../../services/api";
 import { Box, Typography } from "@mui/material";
 
@@ -45,6 +46,7 @@ const PersonalInfoPage: React.FC = () => {
 
           {user.role === "citizen" && <CitizenForm user={user} setUser={setUser} />}
           {user.role === "doctor" && <DoctorForm user={user} setUser={setUser} />}
+          {user.role === "assistant" && <StaffForm user={user} setUser={setUser} isSubUser={true} />}
         </Box>
       )}
     </Layout>

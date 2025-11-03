@@ -90,3 +90,22 @@ def resend_staff_mail(
     if "error" in result:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result["error"])
     return result
+
+@router.get("/staff/{staff_id}", response_model=UserOut)
+def get_staff_member(
+    staff_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role.lower() != "doctor":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    staff = db.query(User).join(DoctorTeam, DoctorTeam.member_id == User.id)\
+        .filter(User.id == staff_id, DoctorTeam.doctor_id == current_user.id)\
+        .first()
+
+    if not staff:
+        raise HTTPException(status_code=404, detail="Alt kullanıcı bulunamadı veya size bağlı değil")
+
+    return staff
+
