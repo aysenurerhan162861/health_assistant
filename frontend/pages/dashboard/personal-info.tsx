@@ -5,6 +5,7 @@ import KVKKCard from "../../components/forms/KVKKCard";
 import CitizenForm from "../../components/forms/CitizenForm";
 import DoctorForm from "../../components/forms/DoctorForm";
 import StaffForm from "../../components/forms/StaffForm";
+import PatientModule from "../../components/patients/PatientModule"; // ✅ Hasta modülü
 import { getMe, User } from "../../services/api";
 import { Box, Typography } from "@mui/material";
 
@@ -34,19 +35,34 @@ const PersonalInfoPage: React.FC = () => {
   return (
     <Layout user={user}>
       {!isConsentGiven ? (
-        <KVKKCard onConsentGiven={() => {
-          localStorage.setItem("kvkk", "true");
-          setIsConsentGiven(true);
-        }} />
+        <KVKKCard
+          onConsentGiven={() => {
+            localStorage.setItem("kvkk", "true");
+            setIsConsentGiven(true);
+          }}
+        />
       ) : (
         <Box>
           <Typography variant="h5" gutterBottom>
             Kişisel Bilgiler
           </Typography>
 
-          {user.role === "citizen" && <CitizenForm user={user} setUser={setUser} />}
-          {user.role === "doctor" && <DoctorForm user={user} setUser={setUser} />}
-          {user.role === "assistant" && <StaffForm user={user} setUser={setUser} isSubUser={true} />}
+          {user.role === "citizen" && (
+            <>
+              <CitizenForm user={user} setUser={setUser} />
+            </>
+          )}
+
+          {user.role === "doctor" && (
+            <>
+              <DoctorForm user={user} setUser={setUser} />
+              <PatientModule /> {/* Hasta modülü burada gösterilecek */}
+            </>
+          )}
+
+          {user.role === "assistant" && (
+            <StaffForm user={user} setUser={setUser} isSubUser={true} />
+          )}
         </Box>
       )}
     </Layout>

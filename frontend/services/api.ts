@@ -36,7 +36,12 @@ export interface ApiResponse {
   token?: string;
   user?: User;
 }
-
+export interface Patient {
+  id: number;
+  name: string;
+  email: string;
+  status: string;
+}
 // Sunucu yanıtını handle et
 async function handleResponse(res: Response): Promise<any> {
   try {
@@ -242,6 +247,19 @@ export const resendStaffMail = async (memberId: number) => {
     const error = await res.json();
     throw new Error(error.detail || "Mail gönderilemedi");
   }
+
+  return res.json();
+};
+// Hastaları çekmek için fonksiyon
+export const getMyPatients = async (): Promise<Patient[]> => {
+  const token = localStorage.getItem("token");
+  if (!token) throw new Error("Token bulunamadı");
+
+  const res = await fetch(`${API_URL}/patients`, {
+    headers: { "token-header": `Bearer ${token}` },
+  });
+
+  if (!res.ok) throw new Error("Hastalar alınamadı");
 
   return res.json();
 };
