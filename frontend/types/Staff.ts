@@ -11,4 +11,10 @@ export interface User {
   neighborhood?: string;
   blood_type?: string;
   photoUrl?: string;
+
+  // Hasta özel alanları
+  chronic_diseases?: string; 
+  age?: number;
+  allergies?: string;
+  about?: string;
 }

@@ -5,7 +5,6 @@ import KVKKCard from "../../components/forms/KVKKCard";
 import CitizenForm from "../../components/forms/CitizenForm";
 import DoctorForm from "../../components/forms/DoctorForm";
 import StaffForm from "../../components/forms/StaffForm";
-import PatientModule from "../../components/patients/PatientModule"; // ✅ Hasta modülü
 import { getMe, User } from "../../services/api";
 import { Box, Typography } from "@mui/material";
 
@@ -21,7 +20,7 @@ const PersonalInfoPage: React.FC = () => {
         setUser(me);
       } catch (err) {
         console.error(err);
-        router.push("/login"); // user alınamazsa login sayfasına yönlendir
+        router.push("/login");
       }
     }
     fetchUser();
@@ -42,22 +41,17 @@ const PersonalInfoPage: React.FC = () => {
           }}
         />
       ) : (
-        <Box>
+        <Box sx={{ mt: 10, mx: 3 }}> {/* 🔹 Navbar + Sidebar boşluğu kadar yukarıdan margin */}
           <Typography variant="h5" gutterBottom>
             Kişisel Bilgiler
           </Typography>
 
           {user.role === "citizen" && (
-            <>
-              <CitizenForm user={user} setUser={setUser} />
-            </>
+            <CitizenForm user={user} setUser={setUser} />
           )}
 
           {user.role === "doctor" && (
-            <>
-              <DoctorForm user={user} setUser={setUser} />
-              <PatientModule /> {/* Hasta modülü burada gösterilecek */}
-            </>
+            <DoctorForm user={user} setUser={setUser} />
           )}
 
           {user.role === "assistant" && (

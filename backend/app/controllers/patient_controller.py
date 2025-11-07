@@ -10,6 +10,7 @@ from app.services.patient_service import (
     reject_patient,
     get_doctor_patients,
     get_selected_doctor,
+    get_approved_patient_by_id
 )
 from app.database import get_db
 from app.models.user import User
@@ -47,7 +48,7 @@ def approve(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    dp = approve_patient(db, dp_id)
+    dp = approve_patient(db, dp_id, current_doctor_id=current_user.id)
     if not dp:
         raise HTTPException(status_code=404, detail="Hasta bulunamadı")
 
@@ -128,3 +129,17 @@ def get_my_doctor(db: Session = Depends(get_db), current_user: User = Depends(ge
     if not doctor_info:
         return {"message": "Henüz bir doktor seçmediniz."}
     return doctor_info
+
+@router.get("/approved/{patient_id}")
+def get_approved_patient(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Doktora bağlı onaylanmış hastayı getirir.
+    """
+    if current_user.role.lower() != "doctor":
+        raise HTTPException(status_code=403, detail="Sadece doktorlar görebilir")
+
+    return get_approved_patient_by_id(db, current_user.id, patient_id)

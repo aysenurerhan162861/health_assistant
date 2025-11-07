@@ -92,3 +92,22 @@ export async function getMyDoctorStatus() {
   if (!res.ok) throw new Error("Doktor durumu alınamadı");
   return await res.json();
 }
+
+export const getPatientById = async (id: number): Promise<User> => {
+  const token = localStorage.getItem("token");
+  if (!token) throw new Error("Token bulunamadı");
+
+  const res = await fetch(`${BASE_URL}/approved/${id}`, {
+    headers: {
+      "Content-Type": "application/json",
+      "token-header": `Bearer ${token}`, // ✅ senin sistemde kullanılan özel header
+    },
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Onaylı hasta bilgisi alınamadı: ${errorText}`);
+  }
+
+  return res.json();
+};

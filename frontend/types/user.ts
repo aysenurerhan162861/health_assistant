@@ -5,4 +5,9 @@ export interface User {
   email?: string;
   role?: string;
   photoUrl?: string;
+
+   // Hasta özel alanları
+  chronic_diseases?: string; 
+  age?: number;
+  gender?: string;
 }
