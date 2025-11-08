@@ -139,25 +139,27 @@ def get_doctor_patients(db: Session, doctor_id: int, status: str = "onaylandı")
 
 def get_selected_doctor(db: Session, patient_id: int):
     """
-    Hastanın seçtiği doktoru ve ilişki durumunu getirir.
+    Hastanın seçtiği tüm doktorları getirir (onaylı, beklemede veya reddedildi).
     """
-    result = (
+    results = (
         db.query(DoctorPatient, User)
         .join(User, DoctorPatient.doctor_id == User.id)
         .filter(DoctorPatient.patient_id == patient_id)
-        .first()
+        .all()
     )
 
-    if result:
-        dp, doctor = result
-        return {
+    doctors = []
+    for dp, doctor in results:
+        doctors.append({
+            "id": dp.id,  # ✅ ekledik
             "doctor_id": doctor.id,
             "doctor_name": doctor.name,
             "doctor_email": doctor.email,
             "status": dp.status,
             "note": dp.note,
-        }
-    return None
+        })
+
+    return doctors
 
 def get_approved_patient_by_id(db: Session, doctor_id: int, patient_id: int):
     """
@@ -194,3 +196,20 @@ def get_approved_patient_by_id(db: Session, doctor_id: int, patient_id: int):
         "chronic_diseases": patient.chronic_diseases,
         "note": dp.note,
     }
+
+def delete_doctor_for_patient(db: Session, patient_id: int, doctor_id: int):
+    """
+    Hastanın kendi doktor bağlantısını silmesi.
+    """
+    link = (
+        db.query(DoctorPatient)
+        .filter(DoctorPatient.patient_id == patient_id, DoctorPatient.doctor_id == doctor_id)
+        .first()
+    )
+
+    if not link:
+        return None
+
+    db.delete(link)
+    db.commit()
+    return True

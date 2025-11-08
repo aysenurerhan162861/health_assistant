@@ -123,9 +123,9 @@ def approved_patients(
 @router.get("/my-doctor")
 def get_my_doctor(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
-    Hastanın seçtiği doktorun bilgilerini getirir.
+    Hastanın seçtiği doktor(lar)ın bilgilerini getirir.
     """
-    doctor_info = get_selected_doctor(db, current_user.id)  # ✅ düzeltildi
+    doctor_info = get_selected_doctor(db, current_user.id)
     if not doctor_info:
         return {"message": "Henüz bir doktor seçmediniz."}
     return doctor_info
@@ -143,3 +143,19 @@ def get_approved_patient(
         raise HTTPException(status_code=403, detail="Sadece doktorlar görebilir")
 
     return get_approved_patient_by_id(db, current_user.id, patient_id)
+
+# ❌ Hastanın doktor bağlantısını silmesi
+@router.delete("/delete-doctor/{doctor_id}")
+def delete_doctor(
+    doctor_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from app.services.patient_service import delete_doctor_for_patient
+
+    result = delete_doctor_for_patient(db, current_user.id, doctor_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Bu doktora ait bağlantı bulunamadı.")
+
+    return {"message": "Doktor bağlantısı başarıyla silindi."}

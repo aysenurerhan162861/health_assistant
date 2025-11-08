@@ -1,79 +1,17 @@
-// src/services/patientApi.ts
-import { User } from "../types/Staff"; // Senin User tipi zaten mevcut, hasta için de kullanabiliriz
+// src/services/PatientApi.ts
+import { User } from "../types/Staff";
 
 const BASE_URL = "http://localhost:8000/api/patients";
 
-/**
- * Doktora bağlı onay bekleyen hastaları getir
- */
-export async function getPendingPatients(): Promise<User[]> {
-  const token = localStorage.getItem("token") || "";
-  const res = await fetch(`${BASE_URL}/pending`, {
-    headers: { "token-header": `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error("Onay bekleyen hastalar alınamadı");
-  return res.json();
+export interface Doctor extends User {
+  specialty?: string;
+  phone?: string;
+  status?: "bekliyor" | "onaylandı" | "reddedildi";
+  note?: string;
 }
 
-/**
- * Doktora bağlı onaylanmış hastaları getir
- */
-export async function getApprovedPatients(): Promise<User[]> {
-  const token = localStorage.getItem("token") || "";
-  const res = await fetch(`${BASE_URL}/approved`, {
-    headers: { "token-header": `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error("Hastalar alınamadı");
-  return res.json();
-}
-
-/**
- * Hastayı onayla (doktor)
- */
-export async function approvePatient(patientId: number): Promise<{ message: string }> {
-  const token = localStorage.getItem("token") || "";
-  const res = await fetch(`${BASE_URL}/approve/${patientId}`, {
-    method: "POST",
-    headers: { "token-header": `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error("Hasta onaylanamadı");
-  return res.json();
-}
-
-/**
- * Hastayı reddet (doktor)
- */
-export async function rejectPatient(patientId: number): Promise<{ message: string }> {
-  const token = localStorage.getItem("token") || "";
-  const res = await fetch(`${BASE_URL}/reject/${patientId}`, {
-    method: "POST",
-    headers: { "token-header": `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error("Hasta reddedilemedi");
-  return res.json();
-}
-
-/**
- * Hasta kendi doktorunu seçtiğinde onay bekleyen tablosuna düşmesi
- */
-// Hasta kendi doktorunu seçtiğinde backend'e gönder
-export async function requestDoctor(payload: { patient_id: number; doctor_id: number; note?: string }) {
-  const token = localStorage.getItem("token") || "";
-  const res = await fetch(`${BASE_URL}/select-doctor`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "token-header": `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error("Doktor seçimi yapılamadı");
-  return res.json();
-}
-/**
- * Doktor listesini çek (CitizenForm için)
- */
-export async function getDoctors(): Promise<User[]> {
+// Doktorlar
+export async function getDoctors(): Promise<Doctor[]> {
   const token = localStorage.getItem("token") || "";
   const res = await fetch(`${BASE_URL}/doctors`, {
     headers: { "token-header": `Bearer ${token}` },
@@ -82,32 +20,101 @@ export async function getDoctors(): Promise<User[]> {
   return res.json();
 }
 
-export async function getMyDoctorStatus() {
+// Hasta kendi doktoru
+export async function getMyDoctorStatus(): Promise<Doctor | null> {
   const token = localStorage.getItem("token") || "";
   const res = await fetch(`${BASE_URL}/my-doctor`, {
-    headers: {
-      "token-header": `Bearer ${token}`, // ⚠ backend'in diğer endpoint’lerinde kullandığı header ile aynı olmalı
-    },
+    headers: { "token-header": `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error("Doktor durumu alınamadı");
-  return await res.json();
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  // Backend array dönüyor, tek doktor varsayımıyla alıyoruz
+  const doctor = data[0]; 
+  if (!doctor) return null;
+
+  return {
+    id: doctor.doctor_id,
+    name: doctor.doctor_name,
+    email: doctor.doctor_email,
+    specialty: doctor.specialty || "", // eğer backend vermiyorsa boş
+    phone: doctor.phone || "",         // eğer backend vermiyorsa boş
+    status: doctor.status as "bekliyor" | "onaylandı" | "reddedildi",
+    note: doctor.note || "",
+  };
 }
 
-export const getPatientById = async (id: number): Promise<User> => {
-  const token = localStorage.getItem("token");
-  if (!token) throw new Error("Token bulunamadı");
+// Doktor seç
+export async function requestDoctor(payload: { doctor_id: number; note?: string }) {
+  const token = localStorage.getItem("token") || "";
+  const res = await fetch(`${BASE_URL}/select-doctor`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "token-header": `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Doktor seçimi yapılamadı");
+  return res.json();
+}
 
-  const res = await fetch(`${BASE_URL}/approved/${id}`, {
-    headers: {
-      "Content-Type": "application/json",
-      "token-header": `Bearer ${token}`, // ✅ senin sistemde kullanılan özel header
-    },
+// Doktor sil
+export async function deleteDoctor(requestId: number) {
+  const token = localStorage.getItem("token") || "";
+  const res = await fetch(`${BASE_URL}/delete-doctor/${requestId}`, {
+    method: "DELETE",
+    headers: { "token-header": `Bearer ${token}` },
   });
 
   if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Onaylı hasta bilgisi alınamadı: ${errorText}`);
+    const err = await res.text();
+    throw new Error(`Silme başarısız: ${err}`);
   }
+}
+// Onaylı hastalar
+export async function getApprovedPatients(): Promise<User[]> {
+  const token = localStorage.getItem("token") || "";
+  const res = await fetch(`${BASE_URL}/approved`, {
+    headers: { "token-header": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Onaylı hastalar alınamadı");
+  return res.json();
+}
 
+// Onaylı hastanın detayı
+export const getPatientById = async (id: number): Promise<User> => {
+  const token = localStorage.getItem("token") || "";
+  const res = await fetch(`${BASE_URL}/approved/${id}`, {
+    headers: { "Content-Type": "application/json", "token-header": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Onaylı hasta bilgisi alınamadı");
   return res.json();
 };
+
+// ✅ Eksik fonksiyonlar — pending hastalar ve onay/reddet
+export async function getPendingPatients(): Promise<User[]> {
+  const token = localStorage.getItem("token") || "";
+  const res = await fetch(`${BASE_URL}/pending`, {
+    headers: { "token-header": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Bekleyen hastalar alınamadı");
+  return res.json();
+}
+
+export async function approvePatient(patientId: number) {
+  const token = localStorage.getItem("token") || "";
+  const res = await fetch(`${BASE_URL}/approve/${patientId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "token-header": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Hasta onaylanamadı");
+  return res.json();
+}
+
+export async function rejectPatient(patientId: number) {
+  const token = localStorage.getItem("token") || "";
+  const res = await fetch(`${BASE_URL}/reject/${patientId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "token-header": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Hasta reddedilemedi");
+  return res.json();
+}
