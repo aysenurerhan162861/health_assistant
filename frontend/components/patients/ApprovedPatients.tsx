@@ -1,42 +1,66 @@
-// src/components/patient/ApprovedPatients.tsx
+// components/ApprovedPatients.tsx
 import React, { useState, useEffect } from "react";
 import {
   Box,
   Paper,
   Typography,
   Avatar,
-  Stack,
-  Snackbar,
-  Alert,
+  Button,
   Dialog,
   DialogTitle,
   DialogContent,
-  CircularProgress,
+  DialogActions,
+  MenuItem,
+  TextField,
+  Snackbar,
+  Alert,
+  Stack,
 } from "@mui/material";
 import { DataGrid, GridColDef, GridRenderCellParams } from "@mui/x-data-grid";
-import { getApprovedPatients, getPatientById } from "../../services/PatientApi";
+import { getApprovedPatients } from "../../services/PatientApi";
+import { getStaffList } from "../../services/StaffApi";
+import { grantPatientPermission, revokePatientPermission } from "../../services/AssistantApi";
 import { User } from "../../types/Staff";
 
 const ApprovedPatients: React.FC = () => {
   const [patients, setPatients] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [staff, setStaff] = useState<User[]>([]);
+  const [permissionDialogOpen, setPermissionDialogOpen] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
+  const [selectedAssistant, setSelectedAssistant] = useState<number | null>(null);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<User | null>(null);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [dialogLoading, setDialogLoading] = useState(false);
+  const [doctorId, setDoctorId] = useState<number | null>(null);
+  const [dialogMode, setDialogMode] = useState<"grant" | "revoke">("grant");
 
   const primaryColor = "#0a2d57";
 
-  // 🔹 Hastaları al
-  const fetchPatients = async () => {
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        try {
+          const userObj = JSON.parse(userStr);
+          setDoctorId(userObj.id);
+        } catch (err) {
+          console.error("user parse hatası:", err);
+        }
+      }
+    }
+  }, []);
+
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const approved = await getApprovedPatients();
-      setPatients(approved);
+      const patientsData = await getApprovedPatients();
+      setPatients(patientsData);
+
+      const staffData = await getStaffList();
+      setStaff(staffData);
     } catch (err: any) {
       console.error(err);
-      setMessage(err.message || "Onaylı hastalar alınamadı ❌");
+      setSnackbarMessage(err.message || "Veri alınamadı ❌");
       setSnackbarOpen(true);
     } finally {
       setLoading(false);
@@ -44,23 +68,53 @@ const ApprovedPatients: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchPatients();
+    fetchData();
   }, []);
 
-  // 🔹 Hasta detaylarını aç
-  const handleOpenPatientCard = async (patientId: number) => {
-    if (!patientId) return;
+  const handleOpenPermissionDialog = (patientId: number, mode: "grant" | "revoke") => {
+    setSelectedPatientId(patientId);
+    setSelectedAssistant(null);
+    setDialogMode(mode);
+    setPermissionDialogOpen(true);
+  };
 
-    try {
-      setDialogLoading(true);
-      setOpenDialog(true);
-      const data = await getPatientById(patientId);
-      setSelectedPatient(data);
-    } catch (err: any) {
-      setMessage(err.message || "Hasta bilgisi alınamadı ❌");
+  const handleGrantPermission = async () => {
+    if (selectedPatientId === null || selectedAssistant === null || doctorId === null) {
+      setSnackbarMessage("Lütfen bir hasta ve asistan seçin ❗");
       setSnackbarOpen(true);
-    } finally {
-      setDialogLoading(false);
+      return;
+    }
+    try {
+      await grantPatientPermission(doctorId, selectedAssistant, selectedPatientId);
+      setSnackbarMessage("İzin başarıyla verildi ✅");
+      setSnackbarOpen(true);
+      setPermissionDialogOpen(false);
+      setSelectedAssistant(null);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      setSnackbarMessage(err.response?.data?.detail || err.message || "İzin verilemedi ❌");
+      setSnackbarOpen(true);
+    }
+  };
+
+  const handleRevokePermission = async () => {
+    if (selectedPatientId === null || selectedAssistant === null || doctorId === null) {
+      setSnackbarMessage("Lütfen bir hasta ve asistan seçin ❗");
+      setSnackbarOpen(true);
+      return;
+    }
+    try {
+      await revokePatientPermission(doctorId, selectedAssistant, selectedPatientId);
+      setSnackbarMessage("İzin başarıyla kaldırıldı ✅");
+      setSnackbarOpen(true);
+      setPermissionDialogOpen(false);
+      setSelectedAssistant(null);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      setSnackbarMessage(err.response?.data?.detail || err.message || "İzin kaldırılamadı ❌");
+      setSnackbarOpen(true);
     }
   };
 
@@ -69,39 +123,48 @@ const ApprovedPatients: React.FC = () => {
       field: "photoUrl",
       headerName: "Fotoğraf",
       flex: 0.5,
-      renderCell: (params: GridRenderCellParams) => (
-        <Avatar src={params.value || ""} sx={{ width: 40, height: 40 }} />
-      ),
+      renderCell: (params) => <Avatar src={params.value || ""} sx={{ width: 40, height: 40 }} />,
     },
-    {
-      field: "name",
-      headerName: "Ad Soyad",
-      flex: 1,
-      renderCell: (params: GridRenderCellParams) => (
-        <Typography
-          sx={{
-            color: primaryColor,
-            textDecoration: "underline",
-            cursor: "pointer",
-          }}
-          onClick={() =>
-            handleOpenPatientCard(params.row.user_id || params.row.patient_id || params.row.id)
-          }
-        >
-          {params.value}
-        </Typography>
-      ),
-    },
+    { field: "name", headerName: "Ad Soyad", flex: 1 },
     { field: "phone", headerName: "Numara", flex: 1 },
-    { field: "about", headerName: "Hasta Açıklaması", flex: 2 },
+    { field: "about", headerName: "Açıklama", flex: 2 },
+    {
+      field: "permissions",
+      headerName: "İzinler",
+      flex: 1,
+      renderCell: (params: GridRenderCellParams) => {
+        const hasPermission = params.row.hasPermission; // backend’den gelmeli
+        return (
+          <Stack direction="row" spacing={1}>
+            {!hasPermission && (
+              <Button
+                variant="contained"
+                size="small"
+                sx={{ bgcolor: "green", "&:hover": { bgcolor: "#0a6d0a" } }}
+                onClick={() => handleOpenPermissionDialog(params.row.id, "grant")}
+              >
+               İzin Ver
+              </Button>
+            )}
+            {hasPermission && (
+              <Button
+                variant="contained"
+                size="small"
+                sx={{ bgcolor: "red", "&:hover": { bgcolor: "#7a0a0a" } }}
+                onClick={() => handleOpenPermissionDialog(params.row.id, "revoke")}
+              >
+                ❌
+              </Button>
+            )}
+          </Stack>
+        );
+      },
+    },
   ];
 
   return (
     <Box sx={{ p: 4, bgcolor: "#f8faff", minHeight: "100vh" }}>
-      <Typography
-        variant="h5"
-        sx={{ color: primaryColor, fontWeight: "bold", mb: 2 }}
-      >
+      <Typography variant="h5" sx={{ color: primaryColor, fontWeight: "bold", mb: 2 }}>
         Onaylı Hastalar
       </Typography>
 
@@ -109,7 +172,7 @@ const ApprovedPatients: React.FC = () => {
         <DataGrid
           rows={patients}
           columns={columns}
-          getRowId={(row) => row.user_id || row.patient_id || row.id}
+          getRowId={(row) => row.id}
           autoHeight
           pageSizeOptions={[5, 10]}
           loading={loading}
@@ -117,54 +180,42 @@ const ApprovedPatients: React.FC = () => {
         />
       </Paper>
 
-      {/* 🧩 Hasta Kartı */}
       <Dialog
-        open={openDialog}
-        onClose={() => setOpenDialog(false)}
+        open={permissionDialogOpen}
+        onClose={() => setPermissionDialogOpen(false)}
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Hasta Bilgileri</DialogTitle>
+        <DialogTitle>
+          {dialogMode === "grant" ? "Asistan Seç ve İzin Ver" : "Asistan Seç ve İzni Kaldır"}
+        </DialogTitle>
         <DialogContent>
-          {dialogLoading ? (
-            <Stack alignItems="center" py={4}>
-              <CircularProgress />
-            </Stack>
-          ) : selectedPatient ? (
-            <Box sx={{ mt: 2 }}>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Avatar
-                  src={selectedPatient.photoUrl || ""}
-                  sx={{ width: 80, height: 80 }}
-                />
-                <Box>
-                  <Typography variant="h6">{selectedPatient.name}</Typography>
-                  <Typography color="text.secondary">
-                    {selectedPatient.email}
-                  </Typography>
-                  <Typography color="text.secondary">
-                    {selectedPatient.phone}
-                  </Typography>
-                </Box>
-              </Stack>
-
-              <Box sx={{ mt: 3 }}>
-                <Typography>
-                  <b>Cinsiyet:</b> {selectedPatient.gender || "Belirtilmemiş"}
-                </Typography>
-                <Typography>
-                  <b>Kronik Hastalıklar:</b>{" "}
-                  {selectedPatient.chronic_diseases || "Belirtilmemiş"}
-                </Typography>
-                <Typography>
-                  <b>Açıklama:</b> {selectedPatient.about || "Yok"}
-                </Typography>
-              </Box>
-            </Box>
-          ) : (
-            <Typography>Hasta bilgisi bulunamadı.</Typography>
-          )}
+          <TextField
+            select
+            label="Asistan Seç"
+            value={selectedAssistant ?? ""}
+            onChange={(e) => setSelectedAssistant(Number(e.target.value))}
+            fullWidth
+          >
+            {staff.map((s) => (
+              <MenuItem key={s.id} value={s.id}>
+                {s.name} ({s.email})
+              </MenuItem>
+            ))}
+          </TextField>
         </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPermissionDialogOpen(false)}>İptal</Button>
+          {dialogMode === "grant" ? (
+            <Button variant="contained" onClick={handleGrantPermission}>
+              İzin Ver
+            </Button>
+          ) : (
+            <Button variant="contained" color="error" onClick={handleRevokePermission}>
+              İzni Kaldır
+            </Button>
+          )}
+        </DialogActions>
       </Dialog>
 
       <Snackbar
@@ -173,7 +224,7 @@ const ApprovedPatients: React.FC = () => {
         onClose={() => setSnackbarOpen(false)}
       >
         <Alert severity="info" sx={{ width: "100%" }}>
-          {message}
+          {snackbarMessage}
         </Alert>
       </Snackbar>
     </Box>

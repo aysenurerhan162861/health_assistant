@@ -8,6 +8,7 @@ from app.services.user_service import get_current_user
 from app.models.user import User
 from app.models.doctor_team import DoctorTeam
 from app.services.doctor_service import resend_staff_email
+from app.services import patient_service
 
 router = APIRouter()
 
@@ -109,3 +110,9 @@ def get_staff_member(
 
     return staff
 
+@router.get("/approved_patients/{doctor_id}")
+def get_approved_patients(doctor_id: int, db: Session = Depends(get_db)):
+    """
+    Doktorun onaylanmış hastalarını getirir.
+    """
+    return patient_service.get_doctor_patients(db, doctor_id)

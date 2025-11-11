@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Drawer,
   List,
@@ -51,36 +51,45 @@ type MenuItem = MenuItemLink | MenuItemGroup;
 
 const Sidebar: React.FC<SidebarProps> = ({ user }) => {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [role, setRole] = useState<string>(""); // Rol state
 
   const handleToggle = (text: string) => {
     setOpenGroup((prev) => (prev === text ? null : text));
   };
 
-  // ✅ LocalStorage'tan kullanıcıyı yedek olarak alıyoruz
-  const storedUser =
-    typeof window !== "undefined"
-      ? JSON.parse(localStorage.getItem("user") || "{}")
-      : {};
+  // Client-side localStorage kontrolü
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const r =
+        storedUser?.role === "doctor"
+          ? "doktor"
+          : storedUser?.role === "citizen"
+          ? "hasta"
+          : storedUser?.role === "assistant"
+          ? "asistan"
+          : storedUser?.role === "sekreter"
+          ? "sekreter"
+          : user?.role === "doctor"
+          ? "doktor"
+          : user?.role === "citizen"
+          ? "hasta"
+          : user?.role === "assistant"
+          ? "asistan"
+          : user?.role === "sekreter"
+          ? "sekreter"
+          : ""; // default boş
+      setRole(r);
+    }
+  }, [user]);
 
-  const roleFromStorage = storedUser?.role || user?.role;
+  const normalizedUser = {
+    name: user?.name || "",
+    email: user?.email || "",
+    photo_url: user?.photo_url || "",
+  };
 
-  // ✅ Rol dönüştürme
-  const normalizedUser = user
-    ? {
-        ...user,
-        role:
-          roleFromStorage === "doctor"
-            ? "doktor"
-            : roleFromStorage === "citizen"
-            ? "hasta"
-            : roleFromStorage === "assistant"
-            ? "asistan"
-            : roleFromStorage === "sekreter"
-            ? "sekreter"
-            : roleFromStorage || "doktor", // default artık "doktor"
-      }
-    : { name: "", email: "", role: "doktor" };
-
+  // Menü tanımları
   const baseItems: MenuItem[] = [
     { text: "Panel", icon: <DashboardIcon fontSize="small" />, href: "/dashboard" },
     { text: "Kişisel Bilgiler", icon: <PersonIcon fontSize="small" />, href: "/dashboard/personal-info" },
@@ -93,8 +102,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
       icon: <FavoriteIcon fontSize="small" />,
       type: "group",
       children: [
-        { text: "Onaylı Hastalar", href: "/dashboard/patients/approved" }, // ✅ düzeltilmiş path
-        { text: "Onay Bekleyenler", href: "/dashboard/patients/pending" }, // ✅ düzeltilmiş path
+        { text: "Onaylı Hastalar", href: "/dashboard/patients/approved" },
+        { text: "Onay Bekleyenler", href: "/dashboard/patients/pending" },
       ],
     },
   ];
@@ -104,7 +113,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
   ];
 
   const staffItems: MenuItem[] = [
-    { text: "Hastalar", icon: <FavoriteIcon fontSize="small" />, href: "/dashboard/patients" },
+    { text: "Hastalar", icon: <FavoriteIcon fontSize="small" />, href: "/dashboard/assistant" },
   ];
 
   const commonItems: MenuItem[] = [
@@ -117,7 +126,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
   ];
 
   let menuItems: MenuItem[] = [...baseItems];
-  const role = normalizedUser.role ?? "doktor";
 
   switch (role) {
     case "doktor":
@@ -131,7 +139,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
       menuItems = [...menuItems, ...staffItems];
       break;
     default:
-      break;
+      menuItems = [...menuItems]; // sadece baseItems
   }
 
   menuItems = [...menuItems, ...commonItems];
@@ -155,28 +163,26 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
       <Toolbar />
 
       {/* Profil */}
-      {normalizedUser && (
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            mb: 1,
-            py: 1,
-          }}
-        >
-          <Avatar
-            src={normalizedUser.photo_url || ""}
-            sx={{ width: 70, height: 70, mb: 1, border: "2px solid white" }}
-          />
-          <Typography variant="subtitle2" sx={{ fontWeight: "bold", textAlign: "center", fontSize: 14 }}>
-            {normalizedUser.name}
-          </Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", textAlign: "center" }}>
-            {role.charAt(0).toUpperCase() + role.slice(1)}
-          </Typography>
-        </Box>
-      )}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          mb: 1,
+          py: 1,
+        }}
+      >
+        <Avatar
+          src={normalizedUser.photo_url || ""}
+          sx={{ width: 70, height: 70, mb: 1, border: "2px solid white" }}
+        />
+        <Typography variant="subtitle2" sx={{ fontWeight: "bold", textAlign: "center", fontSize: 14 }}>
+          {normalizedUser.name}
+        </Typography>
+        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", textAlign: "center" }}>
+          {role.charAt(0).toUpperCase() + role.slice(1)}
+        </Typography>
+      </Box>
 
       {/* Menü */}
       <List sx={{ mt: 0, overflow: "hidden" }}>

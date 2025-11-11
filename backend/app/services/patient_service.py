@@ -126,7 +126,7 @@ def get_doctor_patients(db: Session, doctor_id: int, status: str = "onaylandı")
     patients = []
     for dp, user in results:
         patients.append({
-            "id": dp.id,
+            "id": user.id,
             "patient_id": user.id,
             "name": user.name,
             "email": user.email,

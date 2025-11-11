@@ -25,3 +25,7 @@ class DoctorOut(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+class GrantPermissionRequest(BaseModel):
+    assistant_id: int
+    patient_id: int

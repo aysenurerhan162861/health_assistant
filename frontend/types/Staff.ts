@@ -17,4 +17,6 @@ export interface User {
   age?: number;
   allergies?: string;
   about?: string;
+
+  hasPermission?: boolean;
 }
