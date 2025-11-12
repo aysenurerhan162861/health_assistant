@@ -118,3 +118,16 @@ export async function rejectPatient(patientId: number) {
   if (!res.ok) throw new Error("Hasta reddedilemedi");
   return res.json();
 }
+
+// Onaylı hastanın detayı (tek hasta)
+export const getPatient = async (id?: number): Promise<User> => {
+  if (!id) throw new Error("Hasta ID gerekli");
+  
+  const token = localStorage.getItem("token") || "";
+  const res = await fetch(`${BASE_URL}/approved/${id}`, {
+    headers: { "Content-Type": "application/json", "token-header": `Bearer ${token}` },
+  });
+  
+  if (!res.ok) throw new Error("Hasta bilgisi alınamadı");
+  return res.json();
+};

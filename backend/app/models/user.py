@@ -4,13 +4,11 @@ from enum import Enum as PyEnum
 from sqlalchemy.types import Date
 from sqlalchemy.orm import relationship
 
-
 class UserRole(str, PyEnum):
     CITIZEN = "citizen"
     DOCTOR = "doctor"
     ASSISTANT = "assistant"
     SEKRETER = "sekreter"
-
 
 class User(Base):
     __tablename__ = "users"
@@ -20,15 +18,19 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.CITIZEN)
-    profile_image = Column(String, nullable=True)       # kullanıcı fotoğrafı
-    diploma_number = Column(String, nullable=True)      # sadece doktor için
-    workplace = Column(String, nullable=True)           # doktorun görev yaptığı yer
-    specialization = Column(String, nullable=True)      # doktorun uzmanlık alanı
+    
+    # 👇 Profil bilgileri
+    profile_image = Column(String, nullable=True)
+    diploma_number = Column(String, nullable=True)
+    workplace = Column(String, nullable=True)
+    specialization = Column(String, nullable=True)
     must_change_password = Column(Boolean, default=False)
 
+    # 👇 Kişisel / Hasta bilgileri
     phone = Column(String, nullable=True)
     birth_date = Column(Date, nullable=True)
     gender = Column(String, nullable=True)
+    age = Column(Integer, nullable=True)  # 🔹 yeni eklenen alan
     city = Column(String, nullable=True)
     district = Column(String, nullable=True)
     neighborhood = Column(String, nullable=True)
@@ -37,14 +39,14 @@ class User(Base):
     allergies = Column(String, nullable=True)
     photo_url = Column(String, nullable=True)
 
-    branch = Column(String)
-    experience = Column(Integer)
-    institution = Column(String)
-    diploma_no = Column(String)
-    certifications = Column(Text)  # JSON veya comma-separated string
-    about = Column(Text)
+    # 👇 Doktor/Asistan özel alanları
+    branch = Column(String, nullable=True)
+    experience = Column(Integer, nullable=True)
+    institution = Column(String, nullable=True)
+    diploma_no = Column(String, nullable=True)
+    certifications = Column(Text, nullable=True)  # JSON veya CSV string
+    about = Column(Text, nullable=True)
 
+    # 👇 Hiyerarşik ilişki (örneğin doktorun asistanı)
     parent_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     parent = relationship("User", remote_side=[id])
-
-    

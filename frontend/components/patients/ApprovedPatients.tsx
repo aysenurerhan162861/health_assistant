@@ -21,6 +21,7 @@ import { getApprovedPatients } from "../../services/PatientApi";
 import { getStaffList } from "../../services/StaffApi";
 import { grantPatientPermission, revokePatientPermission } from "../../services/AssistantApi";
 import { User } from "../../types/Staff";
+import PatientCardModal from "./PatientCardModal"; // ✅ Modal import
 
 const ApprovedPatients: React.FC = () => {
   const [patients, setPatients] = useState<User[]>([]);
@@ -33,6 +34,8 @@ const ApprovedPatients: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [doctorId, setDoctorId] = useState<number | null>(null);
   const [dialogMode, setDialogMode] = useState<"grant" | "revoke">("grant");
+
+  const [selectedPatient, setSelectedPatient] = useState<User | null>(null); // ✅ Modal için
 
   const primaryColor = "#0a2d57";
 
@@ -143,7 +146,7 @@ const ApprovedPatients: React.FC = () => {
                 sx={{ bgcolor: "green", "&:hover": { bgcolor: "#0a6d0a" } }}
                 onClick={() => handleOpenPermissionDialog(params.row.id, "grant")}
               >
-               İzin Ver
+                İzin Ver
               </Button>
             )}
             {hasPermission && (
@@ -177,9 +180,17 @@ const ApprovedPatients: React.FC = () => {
           pageSizeOptions={[5, 10]}
           loading={loading}
           disableRowSelectionOnClick
+          onRowClick={(params) => setSelectedPatient(params.row)} // ✅ Satıra tıklayınca modal aç
         />
       </Paper>
 
+      {/* Hasta Detay Modalı */}
+      <PatientCardModal
+        patient={selectedPatient}
+        onClose={() => setSelectedPatient(null)}
+      />
+
+      {/* İzin Dialog */}
       <Dialog
         open={permissionDialogOpen}
         onClose={() => setPermissionDialogOpen(false)}
@@ -218,6 +229,7 @@ const ApprovedPatients: React.FC = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Snackbar */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={4000}

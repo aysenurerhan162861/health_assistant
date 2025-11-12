@@ -12,6 +12,7 @@ class PatientOut(BaseModel):
     email: Optional[str]
     phone: Optional[str]
     note: Optional[str]
+    
 
     model_config = {
         "from_attributes": True  # Pydantic V2 için orm_mode yerine
