@@ -50,3 +50,6 @@ class User(Base):
     # 👇 Hiyerarşik ilişki (örneğin doktorun asistanı)
     parent_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     parent = relationship("User", remote_side=[id])
+
+     # LabReport ilişkisi
+    lab_reports = relationship("LabReport", back_populates="patient", cascade="all, delete-orphan")

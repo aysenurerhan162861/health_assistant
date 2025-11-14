@@ -14,3 +14,4 @@ passlib[bcrypt]==1.7.4
 pdfplumber
 pillow
 pytesseract
+pdf2image

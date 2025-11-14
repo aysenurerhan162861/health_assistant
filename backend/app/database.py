@@ -22,5 +22,5 @@ def get_db() -> Session:
         db.close()
 
 # database.py içinde en alta ekle
-from app.models import user, doctor_patient, doctor_team
+from app.models import user, doctor_patient, doctor_team, lab_report, assistant_patient_permission
 
