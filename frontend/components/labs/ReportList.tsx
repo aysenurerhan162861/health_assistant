@@ -1,3 +1,4 @@
+// ReportList.tsx
 import React, { useState } from "react";
 import {
   Box,
@@ -12,38 +13,84 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
   Typography,
 } from "@mui/material";
 import TestsTable from "./TestsTable";
-
-interface LabReport {
-  id: number;
-  file_name: string;
-  file_path: string;
-  created_at: string;
-  parsed_data: Record<string, any>;
-}
+import { LabReport } from "@/types/LabReport";
+import axios from "axios";
 
 interface ReportListProps {
   reports: LabReport[];
+  patientId: number;
+  refreshReports: () => void;
 }
 
-const ReportList: React.FC<ReportListProps> = ({ reports }) => {
+const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshReports }) => {
   const [selectedReport, setSelectedReport] = useState<LabReport | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  // Yeni tahlil dialogu
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const handlePreview = (report: LabReport) => {
     setSelectedReport(report);
     setPreviewOpen(true);
   };
 
-  const handleClose = () => {
+  const handleClosePreview = () => {
     setPreviewOpen(false);
     setSelectedReport(null);
   };
 
+  const handleOpenUpload = () => setUploadOpen(true);
+  const handleCloseUpload = () => {
+    setUploadOpen(false);
+    setSelectedFile(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setSelectedFile(file);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("patient_id", patientId.toString());
+
+    setUploading(true);
+    try {
+      await axios.post("http://localhost:8000/api/lab_reports/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setUploading(false);
+      handleCloseUpload();
+      refreshReports();
+    } catch (error) {
+      console.error(error);
+      setUploading(false);
+    }
+  };
+
+  const handleOpenPdf = (filePath: string) => {
+    // PDF’i yeni sekmede açar, kullanıcı hem önizleyebilir hem indirebilir
+    window.open(`http://localhost:8000/${filePath}`, "_blank");
+  };
+
   return (
     <Box>
+      {/* Yeni Tahlil Butonu */}
+      <Box mb={2}>
+        <Button variant="contained" onClick={handleOpenUpload}>
+          Yeni Tahlil Ekle
+        </Button>
+      </Box>
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -51,20 +98,16 @@ const ReportList: React.FC<ReportListProps> = ({ reports }) => {
               <TableCell>Tarih</TableCell>
               <TableCell>Dosya</TableCell>
               <TableCell>Detay</TableCell>
-              <TableCell>Önizleme</TableCell>
+              <TableCell>Önizleme / İndir</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {reports.map((report) => (
               <TableRow key={report.id}>
-                <TableCell>{new Date(report.created_at).toLocaleDateString()}</TableCell>
+                <TableCell>{report.upload_date ? new Date(report.upload_date).toLocaleDateString() : "-"}</TableCell>
                 <TableCell>{report.file_name}</TableCell>
                 <TableCell>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => handlePreview(report)}
-                  >
+                  <Button variant="outlined" size="small" onClick={() => handlePreview(report)}>
                     Göster
                   </Button>
                 </TableCell>
@@ -84,8 +127,8 @@ const ReportList: React.FC<ReportListProps> = ({ reports }) => {
         </Table>
       </TableContainer>
 
-      {/* Detay modal */}
-      <Dialog open={previewOpen} onClose={handleClose} maxWidth="md" fullWidth>
+      {/* PDF Önizleme Dialog */}
+      <Dialog open={previewOpen} onClose={handleClosePreview} maxWidth="md" fullWidth>
         <DialogTitle>PDF İçeriği / Test Detayları</DialogTitle>
         <DialogContent>
           {selectedReport ? (
@@ -94,6 +137,20 @@ const ReportList: React.FC<ReportListProps> = ({ reports }) => {
             <Typography>Yükleniyor...</Typography>
           )}
         </DialogContent>
+      </Dialog>
+
+      {/* Yeni Tahlil Yükleme Dialog */}
+      <Dialog open={uploadOpen} onClose={handleCloseUpload} maxWidth="sm" fullWidth>
+        <DialogTitle>Yeni Tahlil Yükle</DialogTitle>
+        <DialogContent>
+          <input type="file" accept=".pdf" onChange={handleFileChange} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseUpload}>İptal</Button>
+          <Button onClick={handleUpload} disabled={!selectedFile || uploading}>
+            {uploading ? "Yükleniyor..." : "Yükle"}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

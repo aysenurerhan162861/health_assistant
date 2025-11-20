@@ -6,20 +6,14 @@ import UploadLabReport from "@/components/labs/UploadLabReport";
 import ReportList from "@/components/labs/ReportList";
 import axios from "axios";
 import { Box, Typography, CircularProgress } from "@mui/material";
-
-interface LabReport {
-  id: number;
-  file_name: string;
-  file_path: string;
-  created_at: string;
-  parsed_data: Record<string, any>;
-}
+import { LabReport } from "../../types/LabReport";
 
 const TahlilPage: React.FC = () => {
   const [reports, setReports] = useState<LabReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [patientId, setPatientId] = useState<number | null>(null);
 
+  // Kullanıcıyı localStorage'dan al
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -28,6 +22,7 @@ const TahlilPage: React.FC = () => {
     }
   }, []);
 
+  // Lab raporlarını API'den çek
   const fetchReports = async () => {
     if (!patientId) return;
     setLoading(true);
@@ -47,7 +42,7 @@ const TahlilPage: React.FC = () => {
 
   return (
     <Layout>
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Typography variant="h4">Tahlillerim</Typography>
       </Box>
 
@@ -62,7 +57,13 @@ const TahlilPage: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <ReportList reports={reports} />
+        patientId && (
+          <ReportList 
+            reports={reports} 
+            patientId={patientId} 
+            refreshReports={fetchReports} 
+          />
+        )
       )}
     </Layout>
   );

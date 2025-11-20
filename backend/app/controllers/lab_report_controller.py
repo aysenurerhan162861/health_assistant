@@ -22,6 +22,7 @@ def upload_lab_report(
         shutil.copyfileobj(file.file, buffer)
 
     parsed_data = parse_pdf_file(file_path)
+    print("Parsed Data:", parsed_data)
 
     report_data = LabReportCreate(
         patient_id=patient_id,

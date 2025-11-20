@@ -14,6 +14,9 @@ RUN apt-get update && \
     pip install --no-cache-dir -r requirements.txt && \
     rm -rf /var/lib/apt/lists/*
 
+# uploads klasörünü oluştur
+RUN mkdir -p uploads/lab_reports
+
 # Uygulama kodunu kopyala
 COPY ./app ./app
 

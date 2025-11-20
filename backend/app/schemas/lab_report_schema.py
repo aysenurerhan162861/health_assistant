@@ -18,3 +18,6 @@ class LabReportResponse(LabReportBase):
 
     class Config:
         orm_mode = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }

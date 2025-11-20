@@ -1,15 +1,30 @@
 import React, { useState } from "react";
-import { Button, Box, Typography } from "@mui/material";
+import {
+  Button,
+  Box,
+  Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
 import axios from "axios";
 
-interface UploadLabReportProps {
+interface UploadModalProps {
   patientId: number;
-  onUploadSuccess: () => void; // tabloyu yenilemek için callback
+  onUploadSuccess: () => void;
 }
 
-const UploadLabReport: React.FC<UploadLabReportProps> = ({ patientId, onUploadSuccess }) => {
+const UploadLabReportModal: React.FC<UploadModalProps> = ({ patientId, onUploadSuccess }) => {
+  const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const handleOpen = () => setOpen(true);
+  const handleClose = () => {
+    setOpen(false);
+    setFile(null);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile: File | null = e.target.files?.[0] ?? null;
@@ -28,8 +43,8 @@ const UploadLabReport: React.FC<UploadLabReportProps> = ({ patientId, onUploadSu
       await axios.post("http://localhost:8000/api/lab_reports/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setFile(null);
       onUploadSuccess();
+      handleClose();
     } catch (err) {
       console.error("Upload failed:", err);
       alert("PDF yükleme başarısız!");
@@ -39,23 +54,30 @@ const UploadLabReport: React.FC<UploadLabReportProps> = ({ patientId, onUploadSu
   };
 
   return (
-    <Box sx={{ mb: 3, display: "flex", flexDirection: "column", gap: 1 }}>
-      <Typography variant="h6">Yeni Tahlil Yükle</Typography>
-      <input
-        type="file"
-        accept="application/pdf"
-        onChange={handleFileChange}
-      />
-      <Button
-        variant="contained"
-        color="primary"
-        disabled={!file || loading}
-        onClick={handleUpload}
-      >
-        {loading ? "Yükleniyor..." : "Yükle"}
-      </Button>
+    <Box sx={{ mb: 3 }}>
+      {/* Modal */}
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+        <DialogTitle>Yeni Tahlil Yükle</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <input type="file" accept="application/pdf" onChange={handleFileChange} />
+          {file && <Typography>Seçilen Dosya: {file.name}</Typography>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose} disabled={loading}>
+            İptal
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleUpload}
+            disabled={!file || loading}
+          >
+            {loading ? "Yükleniyor..." : "Yükle"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
 
-export default UploadLabReport;
+export default UploadLabReportModal;
