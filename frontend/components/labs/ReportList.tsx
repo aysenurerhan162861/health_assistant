@@ -1,4 +1,6 @@
-// ReportList.tsx
+// components/labs/ReportListWithComment.tsx
+"use client";
+
 import React, { useState } from "react";
 import {
   Box,
@@ -17,8 +19,10 @@ import {
   Typography,
 } from "@mui/material";
 import TestsTable from "./TestsTable";
-import { LabReport } from "@/types/LabReport";
+import HealthComment from "./HealthComment";
 import axios from "axios";
+import { LabReport } from "@/types/LabReport";
+import { TestResult } from "@/services/GeminiApi";
 
 interface ReportListProps {
   reports: LabReport[];
@@ -30,7 +34,11 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
   const [selectedReport, setSelectedReport] = useState<LabReport | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  // Yeni tahlil dialogu
+  // Yorum Modal state
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [commentTestResults, setCommentTestResults] = useState<TestResult[] | null>(null);
+
+  // Yeni Tahlil Modal state
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -45,6 +53,23 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
     setSelectedReport(null);
   };
 
+  const handleOpenComment = (report: LabReport) => {
+    setSelectedReport(report);
+    // Gemini API için TestResult array'i oluştur
+    const mapped: TestResult[] = report.parsed_data.tests.map((t) => ({
+      ...t,
+      status: "normal", // normal, low, high olacak şekilde ihtiyaca göre düzenlenebilir
+    }));
+    setCommentTestResults(mapped);
+    setCommentOpen(true); // modal açılıyor
+  };
+
+  const handleCloseComment = () => {
+    setCommentOpen(false);
+    setSelectedReport(null);
+    setCommentTestResults(null);
+  };
+
   const handleOpenUpload = () => setUploadOpen(true);
   const handleCloseUpload = () => {
     setUploadOpen(false);
@@ -52,8 +77,7 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    setSelectedFile(file);
+    setSelectedFile(e.target.files?.[0] ?? null);
   };
 
   const handleUpload = async () => {
@@ -61,36 +85,33 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
 
     const formData = new FormData();
     formData.append("file", selectedFile);
-    formData.append("patient_id", patientId.toString());
+    formData.append("patient_id", String(patientId));
 
-    setUploading(true);
     try {
+      setUploading(true);
       await axios.post("http://localhost:8000/api/lab_reports/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setUploading(false);
       handleCloseUpload();
-      refreshReports();
-    } catch (error) {
-      console.error(error);
+      refreshReports(); // tabloyu yenile
+    } catch (err) {
+      console.error(err);
+      alert("PDF yükleme başarısız!");
       setUploading(false);
     }
   };
 
-  const handleOpenPdf = (filePath: string) => {
-    // PDF’i yeni sekmede açar, kullanıcı hem önizleyebilir hem indirebilir
-    window.open(`http://localhost:8000/${filePath}`, "_blank");
-  };
-
   return (
     <Box>
-      {/* Yeni Tahlil Butonu */}
+      {/* ---------- Yeni Tahlil Ekle Butonu ---------- */}
       <Box mb={2}>
         <Button variant="contained" onClick={handleOpenUpload}>
           Yeni Tahlil Ekle
         </Button>
       </Box>
 
+      {/* ---------- Tahliller Tablosu ---------- */}
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -98,16 +119,22 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
               <TableCell>Tarih</TableCell>
               <TableCell>Dosya</TableCell>
               <TableCell>Detay</TableCell>
-              <TableCell>Önizleme / İndir</TableCell>
+              <TableCell>Yorum Al</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {reports.map((report) => (
               <TableRow key={report.id}>
-                <TableCell>{report.upload_date ? new Date(report.upload_date).toLocaleDateString() : "-"}</TableCell>
+                <TableCell>
+                  {report.upload_date ? new Date(report.upload_date).toLocaleDateString() : "-"}
+                </TableCell>
                 <TableCell>{report.file_name}</TableCell>
                 <TableCell>
-                  <Button variant="outlined" size="small" onClick={() => handlePreview(report)}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => handlePreview(report)}
+                  >
                     Göster
                   </Button>
                 </TableCell>
@@ -115,10 +142,9 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
                   <Button
                     variant="contained"
                     size="small"
-                    href={`http://localhost:8000/${report.file_path}`}
-                    target="_blank"
+                    onClick={() => handleOpenComment(report)}
                   >
-                    Önizle / İndir
+                    Yorum Al
                   </Button>
                 </TableCell>
               </TableRow>
@@ -127,7 +153,7 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
         </Table>
       </TableContainer>
 
-      {/* PDF Önizleme Dialog */}
+      {/* ---------- PDF Önizleme Modal ---------- */}
       <Dialog open={previewOpen} onClose={handleClosePreview} maxWidth="md" fullWidth>
         <DialogTitle>PDF İçeriği / Test Detayları</DialogTitle>
         <DialogContent>
@@ -139,15 +165,37 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
         </DialogContent>
       </Dialog>
 
-      {/* Yeni Tahlil Yükleme Dialog */}
-      <Dialog open={uploadOpen} onClose={handleCloseUpload} maxWidth="sm" fullWidth>
-        <DialogTitle>Yeni Tahlil Yükle</DialogTitle>
+      {/* ---------- Yorum Modal ---------- */}
+      <Dialog open={commentOpen} onClose={handleCloseComment} maxWidth="sm" fullWidth>
+        <DialogTitle>Yapay Zeka Yorumu</DialogTitle>
         <DialogContent>
-          <input type="file" accept=".pdf" onChange={handleFileChange} />
+          {commentTestResults ? (
+            <HealthComment testResults={commentTestResults} />
+          ) : (
+            <Typography>Yorum yükleniyor...</Typography>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseUpload}>İptal</Button>
-          <Button onClick={handleUpload} disabled={!selectedFile || uploading}>
+          <Button onClick={handleCloseComment}>Kapat</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ---------- Yeni Tahlil Yükleme Modal ---------- */}
+      <Dialog open={uploadOpen} onClose={handleCloseUpload} maxWidth="sm" fullWidth>
+        <DialogTitle>Yeni Tahlil Yükle</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <input type="file" accept="application/pdf" onChange={handleFileChange} />
+          {selectedFile && <Typography>Seçilen Dosya: {selectedFile.name}</Typography>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseUpload} disabled={uploading}>
+            İptal
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleUpload}
+            disabled={!selectedFile || uploading}
+          >
             {uploading ? "Yükleniyor..." : "Yükle"}
           </Button>
         </DialogActions>

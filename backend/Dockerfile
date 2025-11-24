@@ -1,24 +1,27 @@
-# Base image
 FROM python:3.11-slim
+
+# Sistem bağımlılıklarını yükle
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    poppler-utils \
+    libjpeg62-turbo-dev \
+    zlib1g-dev \
+    libpng-dev \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # Çalışma dizini
 WORKDIR /app
 
-# PYTHONPATH ile app klasörünü modül yolu yap
-ENV PYTHONPATH=/app
-
-# Dependencies
+# Python bağımlılıkları
 COPY requirements.txt .
-RUN apt-get update && \
-    apt-get install -y poppler-utils tesseract-ocr && \
-    pip install --no-cache-dir -r requirements.txt && \
-    rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir -r requirements.txt
 
-# uploads klasörünü oluştur
-RUN mkdir -p uploads/lab_reports
+# Proje dosyalarını kopyala
+COPY . .
 
-# Uygulama kodunu kopyala
-COPY ./app ./app
+EXPOSE 8000
 
-# Uvicorn ile FastAPI çalıştır
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# 🔥 BURASI ÖNEMLİ: main.py app klasöründe!
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Layout from "@/components/layout/Layout";
 import UploadLabReport from "@/components/labs/UploadLabReport";
 import ReportList from "@/components/labs/ReportList";
+import HealthComment from "@/components/labs/HealthComment"; // <- EKLENDİ
 import axios from "axios";
 import { Box, Typography, CircularProgress } from "@mui/material";
 import { LabReport } from "../../types/LabReport";
@@ -58,11 +59,14 @@ const TahlilPage: React.FC = () => {
         </Box>
       ) : (
         patientId && (
-          <ReportList 
-            reports={reports} 
-            patientId={patientId} 
-            refreshReports={fetchReports} 
-          />
+          <>
+            <ReportList 
+              reports={reports} 
+              patientId={patientId} 
+              refreshReports={fetchReports} 
+            />
+
+          </>
         )
       )}
     </Layout>

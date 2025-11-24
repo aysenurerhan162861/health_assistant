@@ -4,6 +4,7 @@ from app.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from fastapi.staticfiles import StaticFiles
+from app.api import gemini_api
 
 Base.metadata.create_all(bind=engine)
 
@@ -26,3 +27,4 @@ app.include_router(patients.router, prefix="/api/patients")
 app.include_router(assistants.router, prefix="/api/assistants")
 app.include_router(lab_reports.router, prefix="/api/lab_reports")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.include_router(gemini_api.router, prefix="/api/gemini_api")

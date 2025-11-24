@@ -15,3 +15,4 @@ pdfplumber
 pillow
 pytesseract
 pdf2image
+google-genai

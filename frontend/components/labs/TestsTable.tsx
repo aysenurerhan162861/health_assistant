@@ -50,20 +50,26 @@ const TestsTable: React.FC<TestsTableProps> = ({ parsedData }) => {
           {testArray.map((data, idx) => {
             let status = "Normal";
 
-            const range = data.normal_range?.trim();
+            // normal_range'i string olarak al, undefined olabilir
+            const range = (data.normal_range || "").trim();
 
             if (range) {
               let min: number | undefined;
               let max: number | undefined;
 
-              if (range.includes("-")) {
-                const parts = range.split("-").map(Number);
+              // Parantez içindeki değerleri al (N(...), L(...), vb.)
+              const match = range.match(/\((.*)\)/);
+              const inside: string = match?.[1] ?? range; // match yoksa range'i kullan
+
+              // "-" varsa min-max olarak ayır
+              if (inside.includes("-")) {
+                const parts = inside.split("-").map(x => parseFloat(x.trim()));
                 min = parts[0];
                 max = parts[1];
-              } else if (range.startsWith("<")) {
-                max = Number(range.substring(1));
-              } else if (range.startsWith(">")) {
-                min = Number(range.substring(1));
+              } else if (inside.startsWith("<")) {
+                max = parseFloat(inside.substring(1));
+              } else if (inside.startsWith(">")) {
+                min = parseFloat(inside.substring(1));
               }
 
               if (min !== undefined && data.value < min) status = "Düşük";
