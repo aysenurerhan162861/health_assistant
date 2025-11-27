@@ -1,3 +1,4 @@
+import { LabReport } from "./LabReport";
 export interface User {
   id: number;
   name?: string;
@@ -19,4 +20,6 @@ export interface User {
   about?: string;
 
   hasPermission?: boolean;
+
+  lab_reports?: LabReport[];
 }

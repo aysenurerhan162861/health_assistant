@@ -1,5 +1,6 @@
 // src/services/PatientApi.ts
 import { User } from "../types/Staff";
+import { LabReport } from "../types/LabReport";
 
 const BASE_URL = "http://localhost:8000/api/patients";
 
@@ -131,3 +132,4 @@ export const getPatient = async (id?: number): Promise<User> => {
   if (!res.ok) throw new Error("Hasta bilgisi alınamadı");
   return res.json();
 };
+

@@ -1,4 +1,6 @@
 // frontend/types/User.ts
+import { LabReport } from "./LabReport"; 
+
 export interface User {
   id?: number;
   name?: string;
@@ -10,4 +12,7 @@ export interface User {
   chronic_diseases?: string; 
   age?: number;
   gender?: string;
+  lab_reports?: LabReport[];
+
+
 }

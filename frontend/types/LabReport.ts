@@ -14,4 +14,5 @@ export interface LabReport {
     tests: TestData[];
   };
   upload_date: string;
+  doctor_comment?: string;
 }

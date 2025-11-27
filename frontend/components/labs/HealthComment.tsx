@@ -6,6 +6,7 @@ import { Box, Typography } from "@mui/material";
 
 interface Props {
   testResults: TestResult[];
+  readOnly?: boolean;
 }
 
 const HealthComment: React.FC<Props> = ({ testResults }) => {

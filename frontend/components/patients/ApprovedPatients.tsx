@@ -20,8 +20,11 @@ import { DataGrid, GridColDef, GridRenderCellParams } from "@mui/x-data-grid";
 import { getApprovedPatients } from "../../services/PatientApi";
 import { getStaffList } from "../../services/StaffApi";
 import { grantPatientPermission, revokePatientPermission } from "../../services/AssistantApi";
+import { getPatientLabReports } from "../../services/LabApi";
 import { User } from "../../types/Staff";
-import PatientCardModal from "./PatientCardModal"; // ✅ Modal import
+import { LabReport } from "../../types/LabReport";
+import ReportList from "../labs/ReportList";
+import PatientCardModal from "./PatientCardModal";
 
 const ApprovedPatients: React.FC = () => {
   const [patients, setPatients] = useState<User[]>([]);
@@ -35,7 +38,10 @@ const ApprovedPatients: React.FC = () => {
   const [doctorId, setDoctorId] = useState<number | null>(null);
   const [dialogMode, setDialogMode] = useState<"grant" | "revoke">("grant");
 
-  const [selectedPatient, setSelectedPatient] = useState<User | null>(null); // ✅ Modal için
+  const [selectedPatient, setSelectedPatient] = useState<User | null>(null);
+  const [selectedPatientReports, setSelectedPatientReports] = useState<LabReport[]>([]);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<"doctor" | "patient">("patient");
 
   const primaryColor = "#0a2d57";
 
@@ -45,6 +51,7 @@ const ApprovedPatients: React.FC = () => {
       if (userStr) {
         try {
           const userObj = JSON.parse(userStr);
+          setCurrentUserRole(userObj.role); 
           setDoctorId(userObj.id);
         } catch (err) {
           console.error("user parse hatası:", err);
@@ -121,6 +128,29 @@ const ApprovedPatients: React.FC = () => {
     }
   };
 
+  const handleOpenPatientReports = async (patientId: number) => {
+    try {
+      const reports = await getPatientLabReports(patientId);
+      setSelectedPatientReports(reports);
+    } catch (err) {
+      console.error("TAHLİL ALINAMADI:", err);
+      setSelectedPatientReports([]);
+    }
+    setReportModalOpen(true);
+  };
+
+  const handleClosePatientReports = () => {
+    setReportModalOpen(false);
+    setSelectedPatientReports([]);
+  };
+
+  const handleDoctorNoteChange = (id: number, value: string) => {
+    setPatients(prev =>
+      prev.map(p => (p.id === id ? { ...p, doctorNote: value } : p))
+    );
+    // Burada API çağrısı ekleyebilirsin, örn: updateDoctorNote(id, value)
+  };
+
   const columns: GridColDef[] = [
     {
       field: "photoUrl",
@@ -130,13 +160,25 @@ const ApprovedPatients: React.FC = () => {
     },
     { field: "name", headerName: "Ad Soyad", flex: 1 },
     { field: "phone", headerName: "Numara", flex: 1 },
-    { field: "about", headerName: "Açıklama", flex: 2 },
+    {
+      field: "doctorNote",
+      headerName: "Açıklama",
+      flex: 2,
+      renderCell: (params: GridRenderCellParams) => (
+        <input
+          type="text"
+          value={params.value || ""}
+          onChange={(e) => handleDoctorNoteChange(params.row.id, e.target.value)}
+          style={{ width: "100%", border: "none", background: "transparent" }}
+        />
+      ),
+    },
     {
       field: "permissions",
       headerName: "İzinler",
       flex: 1,
       renderCell: (params: GridRenderCellParams) => {
-        const hasPermission = params.row.hasPermission; // backend’den gelmeli
+        const hasPermission = params.row.hasPermission;
         return (
           <Stack direction="row" spacing={1}>
             {!hasPermission && (
@@ -163,6 +205,16 @@ const ApprovedPatients: React.FC = () => {
         );
       },
     },
+    {
+      field: "lab_reports",
+      headerName: "Tahliller",
+      flex: 1,
+      renderCell: (params: GridRenderCellParams) => (
+        <Button variant="contained" size="small" onClick={() => handleOpenPatientReports(params.row.id)}>
+          Detay Gör
+        </Button>
+      ),
+    },
   ];
 
   return (
@@ -180,17 +232,15 @@ const ApprovedPatients: React.FC = () => {
           pageSizeOptions={[5, 10]}
           loading={loading}
           disableRowSelectionOnClick
-          onRowClick={(params) => setSelectedPatient(params.row)} // ✅ Satıra tıklayınca modal aç
+          onRowClick={(params) => setSelectedPatient(params.row)}
         />
       </Paper>
 
-      {/* Hasta Detay Modalı */}
       <PatientCardModal
         patient={selectedPatient}
         onClose={() => setSelectedPatient(null)}
       />
 
-      {/* İzin Dialog */}
       <Dialog
         open={permissionDialogOpen}
         onClose={() => setPermissionDialogOpen(false)}
@@ -229,7 +279,20 @@ const ApprovedPatients: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar */}
+      <Dialog open={reportModalOpen} onClose={handleClosePatientReports} maxWidth="md" fullWidth>
+        <DialogTitle>Hasta Tahlil Raporları</DialogTitle>
+        <DialogContent>
+          {selectedPatientReports.length > 0 ? (
+            <ReportList reports={selectedPatientReports} patientId={selectedPatientId!} refreshReports={fetchData} userRole={currentUserRole} />
+          ) : (
+            <Typography>Lab raporu bulunamadı.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePatientReports}>Kapat</Button>
+        </DialogActions>
+      </Dialog>
+
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={4000}

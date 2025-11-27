@@ -21,3 +21,6 @@ class LabReportResponse(LabReportBase):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+        
+class LabReportUpdateComment(BaseModel):
+    doctor_comment: str

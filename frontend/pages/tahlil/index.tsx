@@ -14,12 +14,15 @@ const TahlilPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [patientId, setPatientId] = useState<number | null>(null);
 
+  const [currentUserRole, setCurrentUserRole] = useState<"doctor" | "patient">("patient");
+
   // Kullanıcıyı localStorage'dan al
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setPatientId(user.id);
+      setCurrentUserRole(user.role); 
     }
   }, []);
 
@@ -43,10 +46,9 @@ const TahlilPage: React.FC = () => {
 
   return (
     <Layout>
-      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Typography variant="h4">Tahlillerim</Typography>
-      </Box>
-
+      <Box sx={{ mt: 6, mb: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+  <Typography variant="h5">Tahlillerim</Typography>
+</Box>
       {/* PDF Yükleme */}
       {patientId && (
         <UploadLabReport patientId={patientId} onUploadSuccess={fetchReports} />
@@ -63,7 +65,9 @@ const TahlilPage: React.FC = () => {
             <ReportList 
               reports={reports} 
               patientId={patientId} 
-              refreshReports={fetchReports} 
+              refreshReports={fetchReports}
+               userRole={currentUserRole}
+          
             />
 
           </>
