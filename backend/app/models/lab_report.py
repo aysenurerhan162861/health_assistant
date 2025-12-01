@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
+
 
 class LabReport(Base):
     __tablename__ = "lab_reports"
@@ -15,3 +16,6 @@ class LabReport(Base):
     doctor_comment = Column(String, nullable=True)
 
     patient = relationship("User", back_populates="lab_reports")
+    patient_id = Column(Integer, ForeignKey("users.id"))
+    tests = relationship("LabTest", back_populates="lab_report", cascade="all, delete-orphan")
+    viewed_by_doctor = Column(Boolean, default=False)

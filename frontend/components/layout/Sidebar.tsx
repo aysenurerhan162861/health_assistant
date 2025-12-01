@@ -106,10 +106,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
         { text: "Onay Bekleyenler", href: "/dashboard/patients/pending" },
       ],
     },
+    { text: "Tahliller", icon: <ScienceIcon fontSize="small" />, href: "/dashboard/doctors/labs" },
   ];
 
   const patientItems: MenuItem[] = [
     { text: "Doktorlar", icon: <PeopleIcon fontSize="small" />, href: "/dashboard/doctors" },
+    { text: "Tahlillerim", icon: <ScienceIcon fontSize="small" />, href: "/tahlil" },
   ];
 
   const staffItems: MenuItem[] = [
@@ -118,8 +120,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
 
   const commonItems: MenuItem[] = [
     { text: "Öğün Ekle", icon: <RestaurantIcon fontSize="small" />, href: "/ogun-ekle" },
-    { text: "Tahliller", icon: <ScienceIcon fontSize="small" />, href: "/tahlil" },
-    { text: "Tansiyon", icon: <MonitorHeartIcon fontSize="small" />, href: "/tansiyon" },
     { text: "MR Analizi", icon: <FavoriteIcon fontSize="small" />, href: "/mr-analizi" },
     { text: "Trendler", icon: <TrendingUpIcon fontSize="small" />, href: "/trendler" },
     { text: "Ayarlar", icon: <SettingsIcon fontSize="small" />, href: "/ayarlar" },

@@ -11,7 +11,7 @@ class PatientOut(BaseModel):
     name: str
     email: Optional[str]
     phone: Optional[str]
-    note: Optional[str]
+    note: Optional[str] = None
     
 
     model_config = {

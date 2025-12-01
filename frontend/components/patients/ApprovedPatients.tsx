@@ -24,7 +24,7 @@ import { getPatientLabReports } from "../../services/LabApi";
 import { User } from "../../types/Staff";
 import { LabReport } from "../../types/LabReport";
 import ReportList from "../labs/ReportList";
-import PatientCardModal from "./PatientCardModal";
+import PatientCardModal from "./PatientCardContent";
 
 const ApprovedPatients: React.FC = () => {
   const [patients, setPatients] = useState<User[]>([]);
