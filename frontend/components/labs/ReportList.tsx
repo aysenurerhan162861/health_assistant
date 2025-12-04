@@ -69,7 +69,7 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
     setCommentLoadingId(report.id ?? null);
     setSelectedReport(report);
     try {
-      const mapped: TestResult[] = report.parsed_data.tests.map((t) => ({ ...t, status: "normal" }));
+      const mapped: TestResult[] = report.parsed_data?.tests?.map((t) => ({ ...t, status: "normal" })) || [];
       const result = await fetchGeminiComment(mapped);
       setCommentText(result);
       setCommentOpen(true);
@@ -86,6 +86,7 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
     setCommentText("");
   };
 
+  // Doktor yorumları
   const handleDoctorCommentChange = (reportId: number, value: string) => {
     setEditableReports((prev) =>
       prev.map((r) => (r.id === reportId ? { ...r, doctor_comment: value } : r))
@@ -93,41 +94,50 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
   };
   const handleSaveDoctorComment = async (reportId: number, comment: string) => {
     try {
-      await updateLabReportComment(reportId, comment);
+      await updateLabReportComment(reportId, comment); // ← artık token otomatik
       refreshReports();
-    } catch {
+    } catch (err: unknown) {
+      console.error(err);
       alert("Doktor açıklaması kaydedilemedi!");
     }
   };
 
-  // Upload işlemleri
   const handleOpenUpload = () => setUploadOpen(true);
-  const handleCloseUpload = () => {
-    setUploadOpen(false);
-    setSelectedFile(null);
-  };
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedFile(e.target.files?.[0] ?? null);
-  };
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-    formData.append("patient_id", String(patientId));
-    try {
-      setUploading(true);
-      await axios.post("http://localhost:8000/api/lab_reports/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setUploading(false);
-      handleCloseUpload();
-      refreshReports();
-    } catch {
-      alert("PDF yükleme başarısız!");
-      setUploading(false);
-    }
-  };
 
+const handleCloseUpload = () => {
+  setUploadOpen(false);
+  setSelectedFile(null);
+};
+
+const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  setSelectedFile(e.target.files?.[0] || null);
+};
+
+const handleUpload = async () => {
+  if (!selectedFile) return;
+
+  const formData = new FormData();
+  formData.append("file", selectedFile);
+  formData.append("patient_id", String(patientId));
+
+  const token = localStorage.getItem("token") || "";
+
+  try {
+    setUploading(true);
+    await axios.post("http://localhost:8000/api/lab_reports/upload", formData, { // <- URL düzeltildi
+      headers: {
+        "token-header": `Bearer ${token}`,
+      },
+    });
+    setUploading(false);
+    handleCloseUpload(); // artık fonksiyon tanımlı
+    refreshReports();
+  } catch (err: unknown) {
+    console.error("Upload failed:", err);
+    alert("PDF yükleme başarısız!");
+    setUploading(false);
+  }
+};
   return (
     <Box sx={{ p: 4, bgcolor: "#e6f0ff", minHeight: "90vh" }}>
       <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 3 }}>

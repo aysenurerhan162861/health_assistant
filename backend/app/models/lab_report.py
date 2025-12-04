@@ -16,6 +16,5 @@ class LabReport(Base):
     doctor_comment = Column(String, nullable=True)
 
     patient = relationship("User", back_populates="lab_reports")
-    patient_id = Column(Integer, ForeignKey("users.id"))
     tests = relationship("LabTest", back_populates="lab_report", cascade="all, delete-orphan")
     viewed_by_doctor = Column(Boolean, default=False)

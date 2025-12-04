@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+from app.services.notification_service import notify_event
 
 from app.services.patient_service import (
     select_doctor_for_patient,
@@ -27,8 +28,17 @@ def select_doctor(
     current_user: User = Depends(get_current_user)
 ):
     dp = select_doctor_for_patient(db, payload.doctor_id, current_user.id, payload.note)
-    return {"message": "Doktor başarıyla seçildi", "status": dp.status}
 
+    # 🔔 Bildirim ekle
+    notify_event(
+        db=db,
+        user_id=payload.doctor_id,
+        event_name="patient_selected_doctor",
+        title="Yeni Hasta Seçildi",
+        body=f"{current_user.name} sizi doktor olarak seçti."
+    )
+
+    return {"message": "Doktor başarıyla seçildi", "status": dp.status}
 
 # ⏳ Doktor onay bekleyen hastaları görüyor
 @router.get("/pending", response_model=List[PatientOut])
@@ -56,6 +66,16 @@ def approve(
     if not patient:
         raise HTTPException(status_code=404, detail="Hasta bilgisi bulunamadı")
 
+    # 🔔 Bildirim: Hasta için
+    from app.services.notification_service import notify_event
+    notify_event(
+        db=db,
+        user_id=patient.id,
+        event_name="doctor_approved_patient",
+        title="Doktor Onayı",
+        body=f"{current_user.name} sizi hastası olarak onayladı."
+    )
+
     return {
         "id": patient.id,
         "name": patient.name,
@@ -63,7 +83,6 @@ def approve(
         "phone": patient.phone,
         "note": dp.note,
     }
-
 
 # ❌ Doktor hastayı reddediyor
 @router.post("/reject/{dp_id}", response_model=PatientOut)

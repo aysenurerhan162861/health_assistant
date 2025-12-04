@@ -17,12 +17,12 @@ import PersonIcon from "@mui/icons-material/Person";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
 import ScienceIcon from "@mui/icons-material/Science";
 import FavoriteIcon from "@mui/icons-material/Favorite";
-import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import SettingsIcon from "@mui/icons-material/Settings";
 import PeopleIcon from "@mui/icons-material/People";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
+import axios from "axios";
 
 interface SidebarProps {
   user?: {
@@ -51,37 +51,45 @@ type MenuItem = MenuItemLink | MenuItemGroup;
 
 const Sidebar: React.FC<SidebarProps> = ({ user }) => {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
-  const [role, setRole] = useState<string>(""); // Rol state
+  const [role, setRole] = useState<string>("");
+  const [unreadLabs, setUnreadLabs] = useState<number>(0);
 
   const handleToggle = (text: string) => {
     setOpenGroup((prev) => (prev === text ? null : text));
   };
 
-  // Client-side localStorage kontrolü
+  // Role ataması
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-      const r =
-        storedUser?.role === "doctor"
-          ? "doktor"
-          : storedUser?.role === "citizen"
-          ? "hasta"
-          : storedUser?.role === "assistant"
-          ? "asistan"
-          : storedUser?.role === "sekreter"
-          ? "sekreter"
-          : user?.role === "doctor"
-          ? "doktor"
-          : user?.role === "citizen"
-          ? "hasta"
-          : user?.role === "assistant"
-          ? "asistan"
-          : user?.role === "sekreter"
-          ? "sekreter"
-          : ""; // default boş
-      setRole(r);
+      const roleMap: Record<string, string> = {
+        doctor: "doktor",
+        citizen: "hasta",
+        assistant: "asistan",
+        sekreter: "sekreter",
+      };
+      setRole(roleMap[storedUser.role] || roleMap[user?.role || ""] || "");
     }
   }, [user]);
+
+  // Doktor için okunmamış tahlil sayısını çek
+  useEffect(() => {
+    const fetchUnreadLabs = async () => {
+      try {
+        if (role === "doktor") {
+          const token = localStorage.getItem("token") || "";
+          const res = await axios.get(
+            "http://localhost:8000/api/lab_reports/unread_lab_count",
+            { headers: { "token-header": `Bearer ${token}` } }
+          );
+          setUnreadLabs(res.data.count || 0);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchUnreadLabs(); // ← Burada çağırıyoruz
+  }, [role]);
 
   const normalizedUser = {
     name: user?.name || "",
@@ -89,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
     photo_url: user?.photo_url || "",
   };
 
-  // Menü tanımları
+  // Menüler (sizin mevcut yapıyı değiştirmedim)
   const baseItems: MenuItem[] = [
     { text: "Panel", icon: <DashboardIcon fontSize="small" />, href: "/dashboard" },
     { text: "Kişisel Bilgiler", icon: <PersonIcon fontSize="small" />, href: "/dashboard/personal-info" },
@@ -126,7 +134,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
   ];
 
   let menuItems: MenuItem[] = [...baseItems];
-
   switch (role) {
     case "doktor":
       menuItems = [...menuItems, ...doctorItems];
@@ -139,9 +146,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
       menuItems = [...menuItems, ...staffItems];
       break;
     default:
-      menuItems = [...menuItems]; // sadece baseItems
+      menuItems = [...menuItems];
   }
-
   menuItems = [...menuItems, ...commonItems];
 
   return (
@@ -163,19 +169,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
       <Toolbar />
 
       {/* Profil */}
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          mb: 1,
-          py: 1,
-        }}
-      >
-        <Avatar
-          src={normalizedUser.photo_url || ""}
-          sx={{ width: 70, height: 70, mb: 1, border: "2px solid white" }}
-        />
+      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", mb: 1, py: 1 }}>
+        <Avatar src={normalizedUser.photo_url || ""} sx={{ width: 70, height: 70, mb: 1, border: "2px solid white" }} />
         <Typography variant="subtitle2" sx={{ fontWeight: "bold", textAlign: "center", fontSize: 14 }}>
           {normalizedUser.name}
         </Typography>
@@ -190,11 +185,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
           "type" in item && item.type === "group" ? (
             <Box key={item.text}>
               <ListItemButton onClick={() => handleToggle(item.text)} sx={{ borderRadius: 1 }}>
-                {item.icon && (
-                  <ListItemIcon sx={{ color: "rgba(255,255,255,0.9)", minWidth: 32, mr: 1 }}>
-                    {item.icon}
-                  </ListItemIcon>
-                )}
+                {item.icon && <ListItemIcon sx={{ color: "rgba(255,255,255,0.9)", minWidth: 32, mr: 1 }}>{item.icon}</ListItemIcon>}
                 <ListItemText
                   primary={item.text}
                   primaryTypographyProps={{ sx: { color: "rgba(255,255,255,0.85)", fontSize: 14, fontWeight: 500 } }}
@@ -205,13 +196,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
                 <List component="div" disablePadding>
                   {item.children.map((child) => (
                     <Link key={child.text} href={child.href} passHref style={{ textDecoration: "none" }}>
-                      <ListItemButton
-                        sx={{
-                          pl: 6,
-                          borderRadius: 1,
-                          "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" },
-                        }}
-                      >
+                      <ListItemButton sx={{ pl: 6, borderRadius: 1, "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}>
                         <ListItemText
                           primary={child.text}
                           primaryTypographyProps={{ sx: { color: "rgba(255,255,255,0.75)", fontSize: 13 } }}
@@ -225,13 +210,16 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
           ) : (
             <Link key={item.text} href={(item as MenuItemLink).href} passHref style={{ textDecoration: "none" }}>
               <ListItemButton sx={{ mb: 0.3, borderRadius: 1, "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}>
-                {item.icon && (
-                  <ListItemIcon sx={{ color: "rgba(255,255,255,0.9)", minWidth: 32, mr: 1 }}>
-                    {item.icon}
-                  </ListItemIcon>
-                )}
+                {item.icon && <ListItemIcon sx={{ color: "rgba(255,255,255,0.9)", minWidth: 32, mr: 1 }}>{item.icon}</ListItemIcon>}
                 <ListItemText
-                  primary={item.text}
+                  primary={
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      {item.text}
+                      {role === "doktor" && item.text === "Tahliller" && unreadLabs > 0 && (
+                        <Box sx={{ width: 10, height: 10, bgcolor: "#800000", borderRadius: "50%", display: "inline-block" }} />
+                      )}
+                    </Box>
+                  }
                   primaryTypographyProps={{ sx: { color: "rgba(255,255,255,0.85)", fontSize: 14, fontWeight: 500 } }}
                 />
               </ListItemButton>

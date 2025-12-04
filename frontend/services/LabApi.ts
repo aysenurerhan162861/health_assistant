@@ -99,4 +99,22 @@ export const markTestViewed = async (testId: number) => {
   return res.json();
 };
 
+export const getUnreadLabCount = async (): Promise<number> => {
+  const token = localStorage.getItem("token") || "";
+  console.log("Token gönderiliyor:", token); // Debug
 
+  const res = await fetch(`${BASE_URL}/unread_lab_count`, {
+    headers: {
+      "token-header": `Bearer ${token}`, // ← header adı backend ile birebir uyumlu olmalı
+    },
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    console.error("Hata:", data);
+    throw new Error(data.detail || "Okunmamış tahlil sayısı alınamadı");
+  }
+
+  return data.count || 0;
+};

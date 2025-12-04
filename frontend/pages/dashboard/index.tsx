@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import Layout from "../../components/layout/Layout";
 import KVKKCard from "../../components/forms/KVKKCard";
 import { Box, Typography } from "@mui/material";
+import NotificationPanel from "@/components/doctors/NotificationPanel";
 
 export default function DashboardHome() {
   const router = useRouter();
@@ -39,7 +40,10 @@ export default function DashboardHome() {
             Dashboard Ana Panel
           </Typography>
           <Typography>Burada özet bilgiler ve istatistikler olabilir.</Typography>
+          {/* Bildirim paneli buraya */}
+  <NotificationPanel />
         </Box>
+        
       )}
     </Layout>
   );

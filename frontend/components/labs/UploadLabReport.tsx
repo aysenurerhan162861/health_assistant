@@ -38,12 +38,17 @@ const UploadLabReportModal: React.FC<UploadModalProps> = ({ patientId, onUploadS
     formData.append("file", file);
     formData.append("patient_id", String(patientId));
 
+    const token = localStorage.getItem("token") || "";
+
     try {
       setLoading(true);
       await axios.post("http://localhost:8000/api/lab_reports/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "token-header": `Bearer ${token}`, // ⚡ Token eklendi
+        },
       });
-      onUploadSuccess();
+      onUploadSuccess(); // Başarılı yükleme sonrası parent refresh
       handleClose();
     } catch (err) {
       console.error("Upload failed:", err);
@@ -54,27 +59,27 @@ const UploadLabReportModal: React.FC<UploadModalProps> = ({ patientId, onUploadS
   };
 
   return (
-   <Box sx={{ mb: 3 }}>
-  <Button variant="contained" onClick={() => setOpen(true)}>Yeni Tahlil Ekle</Button>
-  <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-    <DialogTitle>Yeni Tahlil Yükle</DialogTitle>
-    <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <input type="file" accept="application/pdf" onChange={handleFileChange} />
-      {file && <Typography>Seçilen Dosya: {file.name}</Typography>}
-    </DialogContent>
-    <DialogActions>
-      <Button onClick={handleClose} disabled={loading}>İptal</Button>
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={handleUpload}
-        disabled={!file || loading}
-      >
-        {loading ? "Yükleniyor..." : "Yükle"}
-      </Button>
-    </DialogActions>
-  </Dialog>
-</Box>
+    <Box sx={{ mb: 3 }}>
+      <Button variant="contained" onClick={handleOpen}>Yeni Tahlil Ekle</Button>
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+        <DialogTitle>Yeni Tahlil Yükle</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <input type="file" accept="application/pdf" onChange={handleFileChange} />
+          {file && <Typography>Seçilen Dosya: {file.name}</Typography>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose} disabled={loading}>İptal</Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleUpload}
+            disabled={!file || loading}
+          >
+            {loading ? "Yükleniyor..." : "Yükle"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 
