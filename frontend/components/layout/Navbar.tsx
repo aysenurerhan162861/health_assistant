@@ -1,6 +1,7 @@
 import React from "react";
-import { AppBar, Toolbar, Typography, Button } from "@mui/material";
+import { AppBar, Toolbar, Typography, Button, Box } from "@mui/material";
 import { useRouter } from "next/router";
+import NotificationPanel from "../doctors/NotificationPanel";
 
 const Navbar: React.FC = () => {
   const router = useRouter();
@@ -23,9 +24,14 @@ const Navbar: React.FC = () => {
         <Typography variant="h6" noWrap component="div">
           Sağlık Asistanı
         </Typography>
-        <Button color="inherit" onClick={handleLogout}>
-          Çıkış Yap
-        </Button>
+
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <NotificationPanel />
+
+          <Button color="inherit" onClick={handleLogout}>
+            Çıkış Yap
+          </Button>
+        </Box>
       </Toolbar>
     </AppBar>
   );

@@ -14,7 +14,7 @@ const TahlilPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [patientId, setPatientId] = useState<number | null>(null);
 
-  const [currentUserRole, setCurrentUserRole] = useState<"doctor" | "patient">("patient");
+  const [currentUserRole, setCurrentUserRole] = useState<"doctor" | "citizen">("citizen");
 
   // Kullanıcıyı localStorage'dan al
   useEffect(() => {

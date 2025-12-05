@@ -12,7 +12,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  IconButton,
 } from "@mui/material";
+import CloseIcon from '@mui/icons-material/Close';
 import TestsTable from "./TestsTable";
 import { LabReport } from "@/types/LabReport";
 import { TestResult, fetchGeminiComment } from "@/services/GeminiApi";
@@ -23,7 +25,7 @@ interface ReportListProps {
   reports: LabReport[];
   patientId: number;
   refreshReports: () => void;
-  userRole: "doctor" | "patient";
+  userRole: "doctor" | "citizen";
 }
 
 const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshReports, userRole }) => {
@@ -38,6 +40,9 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
   const [fileSearch, setFileSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [editableReports, setEditableReports] = useState<LabReport[]>(reports);
+
+  // Doktor açıklama toggle
+  const [openCommentBox, setOpenCommentBox] = useState<{ [key: number]: boolean }>({});
 
   const primaryColor = "#0a2d57";
 
@@ -94,7 +99,7 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
   };
   const handleSaveDoctorComment = async (reportId: number, comment: string) => {
     try {
-      await updateLabReportComment(reportId, comment); // ← artık token otomatik
+      await updateLabReportComment(reportId, comment);
       refreshReports();
     } catch (err: unknown) {
       console.error(err);
@@ -102,52 +107,40 @@ const ReportList: React.FC<ReportListProps> = ({ reports, patientId, refreshRepo
     }
   };
 
+  // Upload
   const handleOpenUpload = () => setUploadOpen(true);
+  const handleCloseUpload = () => { setUploadOpen(false); setSelectedFile(null); };
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => setSelectedFile(e.target.files?.[0] || null);
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("patient_id", String(patientId));
+    const token = localStorage.getItem("token") || "";
+    try {
+      setUploading(true);
+      await axios.post("http://localhost:8000/api/lab_reports/upload", formData, {
+        headers: { "token-header": `Bearer ${token}` },
+      });
+      setUploading(false);
+      handleCloseUpload();
+      refreshReports();
+    } catch (err: unknown) {
+      console.error("Upload failed:", err);
+      alert("PDF yükleme başarısız!");
+      setUploading(false);
+    }
+  };
 
-const handleCloseUpload = () => {
-  setUploadOpen(false);
-  setSelectedFile(null);
-};
-
-const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  setSelectedFile(e.target.files?.[0] || null);
-};
-
-const handleUpload = async () => {
-  if (!selectedFile) return;
-
-  const formData = new FormData();
-  formData.append("file", selectedFile);
-  formData.append("patient_id", String(patientId));
-
-  const token = localStorage.getItem("token") || "";
-
-  try {
-    setUploading(true);
-    await axios.post("http://localhost:8000/api/lab_reports/upload", formData, { // <- URL düzeltildi
-      headers: {
-        "token-header": `Bearer ${token}`,
-      },
-    });
-    setUploading(false);
-    handleCloseUpload(); // artık fonksiyon tanımlı
-    refreshReports();
-  } catch (err: unknown) {
-    console.error("Upload failed:", err);
-    alert("PDF yükleme başarısız!");
-    setUploading(false);
-  }
-};
   return (
-    <Box sx={{ p: 4, bgcolor: "#e6f0ff", minHeight: "90vh" }}>
+    <Box sx={{ p: 4,
+    minHeight: "90vh",
+    bgcolor: userRole === "citizen" ? "#e6f0ff" : "transparent",}}>
       <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 3 }}>
         {/* Üst Panel */}
         <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", mb: 2, gap: 2 }}>
-          {userRole === "doctor" && (
-            <Button variant="contained" onClick={handleOpenUpload} sx={{ bgcolor: primaryColor, "&:hover": { bgcolor: "#082147" } }}>
-              Yeni Tahlil Ekle
-            </Button>
-          )}
+          {/* Doktor için Yeni Tahlil Ekle butonu pasif/gizli */}
+          {userRole === "doctor" && null}
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
             <TextField label="Dosya Ara" size="small" value={fileSearch} onChange={(e) => setFileSearch(e.target.value)} />
             <TextField label="Sırala" size="small" select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}>
@@ -184,16 +177,30 @@ const handleUpload = async () => {
                   </td>
                   <td style={{ padding: "8px" }}>
                     {userRole === "doctor" ? (
-                      <Box sx={{ display: "flex", gap: 1 }}>
-                        <TextField
-                          value={report.doctor_comment || ""}
-                          onChange={(e) => handleDoctorCommentChange(report.id!, e.target.value)}
-                          multiline minRows={2} fullWidth variant="outlined"
-                        />
-                        <Button variant="contained" onClick={() => handleSaveDoctorComment(report.id!, report.doctor_comment || "")} sx={{ bgcolor: primaryColor, "&:hover": { bgcolor: "#082147" } }}>
-                          Kaydet
-                        </Button>
-                      </Box>
+                      <>
+                        {!openCommentBox[report.id] ? (
+                          <Button variant="outlined" size="small" onClick={() => setOpenCommentBox({ ...openCommentBox, [report.id]: true })}>
+                            + Açıklama Ekle
+                          </Button>
+                        ) : (
+                          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <Typography>Açıklama:</Typography>
+                              <IconButton size="small" onClick={() => setOpenCommentBox({ ...openCommentBox, [report.id]: false })}>
+                                <CloseIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            <TextField
+                              value={report.doctor_comment || ""}
+                              onChange={(e) => handleDoctorCommentChange(report.id!, e.target.value)}
+                              multiline minRows={2} fullWidth variant="outlined"
+                            />
+                            <Button variant="contained" onClick={() => handleSaveDoctorComment(report.id!, report.doctor_comment || "")} sx={{ bgcolor: primaryColor, "&:hover": { bgcolor: "#082147" } }}>
+                              Kaydet
+                            </Button>
+                          </Box>
+                        )}
+                      </>
                     ) : (
                       <TextField value={report.doctor_comment || ""} multiline minRows={2} fullWidth InputProps={{ readOnly: true }} variant="outlined" />
                     )}

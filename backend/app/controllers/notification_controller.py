@@ -106,3 +106,19 @@ def get_unread_notifications(db: Session = Depends(get_db), current_user: User =
         NotificationHistory.read == False  # Eğer NotificationHistory modelinde read alanı yoksa ekleyelim
     ).order_by(NotificationHistory.created_at.desc()).all()
     return unread
+
+@router.patch("/mark_read/{notification_id}")
+def mark_notification_read(notification_id: int, 
+                           db: Session = Depends(get_db),
+                           current_user: User = Depends(get_current_user)):
+    notif = db.query(NotificationHistory).filter(
+        NotificationHistory.id == notification_id,
+        NotificationHistory.user_id == current_user.id
+    ).first()
+
+    if not notif:
+        return {"message": "Bildirim bulunamadı"}
+
+    notif.read = True
+    db.commit()
+    return {"message": "OK"}

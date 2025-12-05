@@ -40,8 +40,6 @@ export default function DashboardHome() {
             Dashboard Ana Panel
           </Typography>
           <Typography>Burada özet bilgiler ve istatistikler olabilir.</Typography>
-          {/* Bildirim paneli buraya */}
-  <NotificationPanel />
         </Box>
         
       )}
