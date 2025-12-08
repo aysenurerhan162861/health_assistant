@@ -9,7 +9,7 @@ from app.models.user import User
 from app.models.doctor_patient import DoctorPatient
 from app.services.user_service import get_current_user
 from app.services.notification_service import notify_event
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import shutil
 import os
 
@@ -166,3 +166,19 @@ def unread_lab_count(
     )
 
     return {"count": count}
+
+@router.get("/file/{report_id}")
+async def get_file(report_id: int, db: Session = Depends(get_db)):
+    report = db.query(LabReport).filter(LabReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    file_path = f"/app/uploads/lab_reports/{report.file_name}"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        path=file_path,
+        filename=report.file_name,
+        media_type="application/pdf"   # ← BUNU EKLE
+    )
