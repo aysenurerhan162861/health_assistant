@@ -1,3 +1,5 @@
+"use client"; // sayfanın tamamen client-side çalışmasını sağlar
+
 import React from "react";
 import NotificationSettingsList from "@/components/ayarlar/NotificationSettingsList";
 import Layout from "@/components/layout/Layout";

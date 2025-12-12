@@ -1,4 +1,5 @@
 // frontend/components/patients/PatientCardModal.tsx
+"use client";
 import React, { useEffect, useState } from "react";
 import { Box, Avatar, Typography, CircularProgress } from "@mui/material";
 import { User } from "../../types/User";

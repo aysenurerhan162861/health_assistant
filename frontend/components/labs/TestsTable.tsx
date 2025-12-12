@@ -1,4 +1,6 @@
 // components/labs/TestsTable.tsx
+"use client";
+
 import React from "react";
 import {
   Table,

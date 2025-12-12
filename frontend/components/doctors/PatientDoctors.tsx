@@ -1,5 +1,7 @@
 // components/doctors/PatientDoctors.tsx
-import React, { useEffect, useState } from "react";
+"use client";
+
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   Box,
   Paper,
@@ -14,47 +16,59 @@ import {
   Stack,
   Chip,
   CircularProgress,
+  List,
+  ListItem,
 } from "@mui/material";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
-import {
-  getDoctors,
-  requestDoctor,
-  getMyDoctorStatus,
-  deleteDoctor,
-} from "../../services/PatientApi";
+import { getDoctors, requestDoctor, getMyDoctors, deleteDoctor } from "../../services/PatientApi";
 import { User } from "../../types/Staff";
+import { connectWebSocket, sendMessage } from "@/services/ChatApi";
+import ChatWindow from "@/components/message/ChatWindow";
 
 interface MyDoctor extends User {
   status: "bekliyor" | "onaylandı" | "reddedildi";
   note?: string;
 }
 
-const PatientDoctors: React.FC = () => {
+interface ChatMessage {
+  id: number;
+  sender_id: number;
+  sender_name: string;
+  text: string;
+  created_at: string;
+}
+
+interface PatientDoctorsProps {
+  openDoctorId?: number | undefined; // Bildirimden modal açmak için optional
+}
+
+const PatientDoctors: React.FC<PatientDoctorsProps> = ({ openDoctorId }) => {
   const [allDoctors, setAllDoctors] = useState<User[]>([]);
   const [myDoctors, setMyDoctors] = useState<MyDoctor[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<number | "">("");
   const [loading, setLoading] = useState(false);
-  const [filterValue, setFilterValue] = useState(""); // filtre değeri
-  const [filterBy, setFilterBy] = useState<"name" | "email" | "status">("name"); // filtre türü
+  const [filterValue, setFilterValue] = useState("");
+  const [filterBy, setFilterBy] = useState<"name" | "email" | "status">("name");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [currentDoctor, setCurrentDoctor] = useState<MyDoctor | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const primaryColor = "#0a2d57";
+  const patientId = Number(localStorage.getItem("user_id") || 0);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+  useEffect(scrollToBottom, [messages]);
 
   const fetchData = async () => {
     try {
       const doctors = await getDoctors();
       setAllDoctors(doctors || []);
-
-      const myDoc = await getMyDoctorStatus();
-      if (myDoc) {
-        setMyDoctors([
-          {
-            ...myDoc,
-            status: myDoc.status || "bekliyor",
-          },
-        ]);
-      } else {
-        setMyDoctors([]);
-      }
+      const myDocs = await getMyDoctors();
+      setMyDoctors(myDocs || []);
     } catch (err) {
       console.error(err);
     }
@@ -63,6 +77,14 @@ const PatientDoctors: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Bildirimden gelen openDoctorId ile modal açma
+  useEffect(() => {
+    if (openDoctorId && myDoctors.length > 0) {
+      const doctor = myDoctors.find((d) => d.id === openDoctorId);
+      if (doctor) handleMessageDoctor(doctor);
+    }
+  }, [openDoctorId, myDoctors]);
 
   const handleRequestDoctor = async () => {
     if (!selectedDoctor || typeof selectedDoctor !== "number") {
@@ -92,6 +114,82 @@ const PatientDoctors: React.FC = () => {
     }
   };
 
+  const handleMessageDoctor = (doctor: MyDoctor) => {
+    setCurrentDoctor(doctor);
+    setChatOpen(true);
+
+    const room = `chat_${Math.min(patientId, doctor.id)}_${Math.max(patientId, doctor.id)}`;
+
+    connectWebSocket(
+      room,
+      (msg: string) => {
+        try {
+          const data = JSON.parse(msg);
+          if (data.type === "message") {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: data.id,
+                sender_id: data.sender_id,
+                sender_name: data.sender_name,
+                text: data.text,
+                created_at: data.created_at,
+              },
+            ]);
+          } else if (data.type === "history") {
+            setMessages(
+              data.messages.map((m: any) => ({
+                id: m.id,
+                sender_id: m.sender_id,
+                sender_name: m.sender_name,
+                text: m.text,
+                created_at: m.created_at,
+              }))
+            );
+          }
+        } catch (err) {
+          console.error("Mesaj parse edilemedi:", err);
+        }
+      },
+      () => {
+        sendMessage(
+          JSON.stringify({
+            type: "history",
+            doctor_id: doctor.id,
+            patient_id: patientId,
+          })
+        );
+      },
+      () => console.log("WS CLOSE")
+    );
+  };
+
+  const handleSendMessage = () => {
+    if (!newMessage.trim() || !currentDoctor) return;
+
+    const payload = {
+      type: "message",
+      doctor_id: currentDoctor.id,
+      patient_id: patientId,
+      text: newMessage,
+    };
+
+    sendMessage(JSON.stringify(payload));
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        sender_id: patientId,
+        sender_name: "Sen",
+        text: newMessage,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+
+    setNewMessage("");
+  };
+
   const columns: GridColDef[] = [
     { field: "name", headerName: "Ad Soyad", flex: 1 },
     { field: "email", headerName: "E-posta", flex: 1 },
@@ -119,47 +217,58 @@ const PatientDoctors: React.FC = () => {
     {
       field: "actions",
       headerName: "İşlem",
-      flex: 0.5,
+      flex: 0.7,
       renderCell: (params) => (
-        <Button
-          color="error"
-          variant="outlined"
-          onClick={() => handleDeleteDoctor(params.row.id)}
-        >
-          Sil
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button
+            color="error"
+            variant="outlined"
+            size="small"
+            onClick={() => handleDeleteDoctor(params.row.id)}
+          >
+            Sil
+          </Button>
+          <Button
+            color="primary"
+            variant="outlined"
+            size="small"
+            onClick={() =>
+              handleMessageDoctor(
+                myDoctors.find((d) => d.id === params.row.id)!
+              )
+            }
+          >
+            Mesaj
+          </Button>
+        </Stack>
       ),
     },
   ];
 
-  // filtrelenmiş satırlar
-  const filteredRows = myDoctors
-    .filter((doc) => {
-      if (!filterValue) return true;
-      const val = filterValue.toLowerCase();
-      if (filterBy === "name") return doc.name?.toLowerCase().includes(val);
-      if (filterBy === "email") return doc.email?.toLowerCase().includes(val);
-      if (filterBy === "status") return doc.status?.toLowerCase().includes(val);
-      return true;
-    })
-    .map((doc) => ({
-      id: doc.id || Math.random(),
-      name: doc.name || "İsim yok",
-      email: doc.email || "Email yok",
-      status: doc.status || "bekliyor",
-    }));
+  const filteredRows = useMemo(() => {
+    return myDoctors
+      .filter((doc) => {
+        if (!filterValue) return true;
+        const val = filterValue.toLowerCase();
+        if (filterBy === "name") return doc.name?.toLowerCase().includes(val);
+        if (filterBy === "email") return doc.email?.toLowerCase().includes(val);
+        if (filterBy === "status") return doc.status?.toLowerCase().includes(val);
+        return true;
+      })
+      .map((doc) => ({
+        id: doc.id,
+        name: doc.name || "İsim yok",
+        email: doc.email || "Email yok",
+        status: doc.status,
+      }));
+  }, [filterValue, filterBy, myDoctors]);
 
   if (!allDoctors.length) return <CircularProgress />;
 
   return (
     <Box sx={{ p: 4, bgcolor: "#e6f0ff", minHeight: "90vh" }}>
       <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 3 }}>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={3}
-        >
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h6" sx={{ color: primaryColor, fontWeight: "bold" }}>
             Doktorlarım
           </Typography>
@@ -172,40 +281,28 @@ const PatientDoctors: React.FC = () => {
           </Button>
         </Stack>
 
-        {/* Filtre alanı */}
-<Stack
-  direction={{ xs: "column", sm: "row" }}
-  spacing={2}
-  mb={2}
-  alignItems="center"
->
-  <TextField
-    select
-    label="Filtreleme Türü"
-    value={filterBy}
-    onChange={(e) =>
-      setFilterBy(e.target.value as "name" | "email" | "status")
-    }
-    size="small"
-    sx={{ 
-      width: "auto",           // dropdown genişliği otomatik
-      minWidth: 140           // yazılar tam görünür
-    }}
-  >
-    <MenuItem value="name">İsim</MenuItem>
-    <MenuItem value="email">Email</MenuItem>
-    <MenuItem value="status">Durum</MenuItem>
-  </TextField>
-
-  <TextField
-    label="Ara"
-    value={filterValue}
-    onChange={(e) => setFilterValue(e.target.value)}
-    fullWidth
-    size="small"
-    sx={{ flexGrow: 1 }} // kalan alanı kaplasın
-  />
-</Stack>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mb={2} alignItems="center">
+          <TextField
+            select
+            label="Filtreleme Türü"
+            value={filterBy}
+            onChange={(e) => setFilterBy(e.target.value as "name" | "email" | "status")}
+            size="small"
+            sx={{ width: "auto", minWidth: 140 }}
+          >
+            <MenuItem value="name">İsim</MenuItem>
+            <MenuItem value="email">Email</MenuItem>
+            <MenuItem value="status">Durum</MenuItem>
+          </TextField>
+          <TextField
+            label="Ara"
+            value={filterValue}
+            onChange={(e) => setFilterValue(e.target.value)}
+            fullWidth
+            size="small"
+            sx={{ flexGrow: 1 }}
+          />
+        </Stack>
 
         <div style={{ height: 450, width: "100%" }}>
           <DataGrid
@@ -249,6 +346,26 @@ const PatientDoctors: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+     {/* Mesajlaşma Dialog */}
+<Dialog open={chatOpen} onClose={() => setChatOpen(false)} fullWidth maxWidth="sm">
+  <DialogTitle>{currentDoctor?.name} ile Mesajlaşma</DialogTitle>
+
+  <DialogContent>
+    {currentDoctor && (
+      <ChatWindow
+        room={`doctor_${currentDoctor.id}_patient_${patientId}`}
+        senderId={patientId}
+        receiverId={currentDoctor.id}
+        role="patient"
+      />
+    )}
+  </DialogContent>
+
+  <DialogActions>
+    <Button onClick={() => setChatOpen(false)}>Kapat</Button>
+  </DialogActions>
+</Dialog>
     </Box>
   );
 };

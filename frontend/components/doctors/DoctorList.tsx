@@ -1,4 +1,6 @@
 // components/patients/DoctorList.tsx
+"use client";
+
 import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
@@ -19,7 +21,7 @@ import { DataGrid, GridColDef, GridToolbar } from "@mui/x-data-grid";
 import {
   getDoctors,
   requestDoctor,
-  getMyDoctorStatus,
+  getMyDoctors,
   deleteDoctor,
 } from "../../services/PatientApi";
 import { User } from "../../types/Staff";
@@ -39,25 +41,16 @@ const DoctorList: React.FC = () => {
   const primaryColor = "#0a2d57";
 
   const fetchData = async () => {
-    try {
-      const doctors = await getDoctors();
-      setAllDoctors(doctors || []);
+  try {
+    const doctors = await getDoctors();
+    setAllDoctors(doctors || []);
 
-      const myDoc = await getMyDoctorStatus();
-      if (myDoc) {
-        setMyDoctors([
-          {
-            ...myDoc,
-            status: myDoc.status || "bekliyor",
-          },
-        ]);
-      } else {
-        setMyDoctors([]);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+    const myDocs = await getMyDoctors();
+    setMyDoctors(myDocs || []);
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   useEffect(() => {
     fetchData();

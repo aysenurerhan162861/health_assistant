@@ -1,3 +1,5 @@
+"use client"; // sayfanın sadece client-side çalışmasını sağlar
+
 import React from "react";
 import ApprovedPatients from "../../../components/patients/ApprovedPatients";
 import Navbar from "../../../components/layout/Navbar";

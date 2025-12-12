@@ -4,6 +4,7 @@ import theme from "../theme/theme";
 import { useEffect } from "react";
 import { requestFirebaseNotificationPermission } from "../firebase";
 
+
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
     // Service Worker kaydı
@@ -28,6 +29,7 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      
       <Component {...pageProps} />
     </ThemeProvider>
   );

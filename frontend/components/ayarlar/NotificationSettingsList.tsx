@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useState } from "react";
 import { NotificationSetting } from "@/types/Notification";
 import NotificationSettingCard from "./NotificationSettingCard";

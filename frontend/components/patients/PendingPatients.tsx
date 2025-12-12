@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import {
   Box,
@@ -32,7 +34,6 @@ const PendingPatients: React.FC = () => {
   const [dialogLoading, setDialogLoading] = useState(false);
   const primaryColor = "#0a2d57";
 
-  // 🔹 Bekleyen hastaları çek
   const fetchPendingPatients = async () => {
     try {
       setLoading(true);
@@ -50,7 +51,6 @@ const PendingPatients: React.FC = () => {
     fetchPendingPatients();
   }, []);
 
-  // 🔹 Hasta detayını aç
   const handleOpenPatientCard = async (patientId: number) => {
     try {
       setDialogLoading(true);
@@ -65,7 +65,6 @@ const PendingPatients: React.FC = () => {
     }
   };
 
-  // 🔹 Onayla / Reddet işlemleri
   const handleAction = async (id: number, action: "approve" | "reject") => {
     try {
       setLoading(true);
@@ -107,11 +106,7 @@ const PendingPatients: React.FC = () => {
             textDecoration: "underline",
             cursor: "pointer",
           }}
-          onClick={() =>
-            handleOpenPatientCard(
-              params.row.user_id || params.row.patient_id || params.row.id
-            )
-          }
+          onClick={() => handleOpenPatientCard(params.row.id)}
         >
           {params.value}
         </Typography>
@@ -131,7 +126,7 @@ const PendingPatients: React.FC = () => {
             size="small"
             onClick={(e) => {
               e.stopPropagation();
-              handleAction(params.row.user_id || params.row.id, "approve");
+              handleAction(params.row.id, "approve");
             }}
           >
             Onayla
@@ -142,7 +137,7 @@ const PendingPatients: React.FC = () => {
             size="small"
             onClick={(e) => {
               e.stopPropagation();
-              handleAction(params.row.user_id || params.row.id, "reject");
+              handleAction(params.row.id, "reject");
             }}
           >
             Reddet
@@ -165,7 +160,7 @@ const PendingPatients: React.FC = () => {
         <DataGrid
           rows={patients}
           columns={columns}
-          getRowId={(row) => row.user_id || row.patient_id || row.id}
+          getRowId={(row) => row.id} // artık tek tip number
           autoHeight
           pageSizeOptions={[5, 10]}
           loading={loading}
@@ -173,7 +168,6 @@ const PendingPatients: React.FC = () => {
         />
       </Paper>
 
-      {/* 🧩 Hasta Kartı */}
       <Dialog
         open={openDialog}
         onClose={() => setOpenDialog(false)}

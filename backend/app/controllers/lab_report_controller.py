@@ -21,7 +21,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # Hasta tahlil yükleme
 # -----------------------------
 @router.post("/upload", response_model=LabReportResponse)
-def upload_lab_report(
+async def upload_lab_report(
     patient_id: int = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -31,7 +31,6 @@ def upload_lab_report(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
 
-    # Debug: gelen verileri kontrol
     print(f"Uploading report for patient {patient_id}, file: {file.filename}")
 
     # Dosyayı kaydet
@@ -39,41 +38,32 @@ def upload_lab_report(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # PDF'i parse et
+    # PDF parse
     parsed_data = parse_pdf_file(file_path) or {"tests": []}
-
-    # Tüm testlere viewedByDoctor ekle
     for test in parsed_data.get("tests", []):
         test["viewedByDoctor"] = False
 
-    # DB'ye kaydet
+    # DB kaydı
     report_data = LabReportCreate(
         patient_id=patient_id,
         file_name=file.filename,
         file_path=file_path,
         parsed_data=parsed_data,
     )
-
     report = create_lab_report(db, report_data)
 
-    # -----------------------------
-    # 🔔 Doktor için bildirim ekle
-    # -----------------------------
-    from app.models.doctor_patient import DoctorPatient
-    from app.services.notification_service import notify_event
-
+    # 🔔 Doktor için bildirim
     doctor_relation = db.query(DoctorPatient).filter(DoctorPatient.patient_id == patient_id).first()
     if doctor_relation:
-        notify_event(
+        await notify_event(   # ← burası artık await ediliyor
             db=db,
-            user_id=doctor_relation.doctor_id,  # Doktorun user_id'si
+            user_id=doctor_relation.doctor_id,
             event_name="lab_uploaded",
             title="Yeni Tahlil Yüklendi",
             body=f"Hasta yeni bir tahlil yükledi: {file.filename}"
         )
 
     return report
-
 # Hasta kendi raporlarını listeler
 # -----------------------------
 @router.get("/patient/{patient_id}", response_model=list[LabReportResponse])

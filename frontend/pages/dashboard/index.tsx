@@ -1,9 +1,10 @@
+"use client"; // Sayfanın tamamen client-side render olmasını sağlar
+
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "../../components/layout/Layout";
 import KVKKCard from "../../components/forms/KVKKCard";
 import { Box, Typography } from "@mui/material";
-import NotificationPanel from "@/components/doctors/NotificationPanel";
 
 export default function DashboardHome() {
   const router = useRouter();
@@ -41,7 +42,6 @@ export default function DashboardHome() {
           </Typography>
           <Typography>Burada özet bilgiler ve istatistikler olabilir.</Typography>
         </Box>
-        
       )}
     </Layout>
   );

@@ -15,6 +15,7 @@ import {
   IconButton,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import EditIcon from "@mui/icons-material/Edit";
 import TestsTable from "./TestsTable";
 import { LabReport } from "@/types/LabReport";
 import { TestResult, fetchGeminiComment } from "@/services/GeminiApi";
@@ -51,6 +52,11 @@ const ReportList: React.FC<ReportListProps> = ({
   // 🔥 OKUNAN TAHLİLLER STATE
   const [readReports, setReadReports] = useState<number[]>([]);
 
+  // Accordion state (doktor için)
+  const [openRowId, setOpenRowId] = useState<number | null>(null);
+  const [accordionComment, setAccordionComment] = useState<string>("");
+  const [savingAccordionId, setSavingAccordionId] = useState<number | null>(null);
+
   // ✔️ localStorage'dan yükle (sadece doktor)
   useEffect(() => {
     if (userRole !== "doctor") return;
@@ -61,6 +67,11 @@ const ReportList: React.FC<ReportListProps> = ({
       setReadReports(JSON.parse(saved));
     }
   }, [userRole, patientId]);
+
+  // Eğer parent'tan reports değişirse editableReports güncelle
+  useEffect(() => {
+    setEditableReports(reports);
+  }, [reports]);
 
   // ✔️ Okundu işaretleme fonksiyonu
   const markReportAsRead = (reportId: number) => {
@@ -76,41 +87,13 @@ const ReportList: React.FC<ReportListProps> = ({
   };
 
   // 📄 PDF önizleme açılırken okundu işaretle
-const handlePreview = async (report: LabReport) => {
+  const handlePreview = (report: LabReport) => {
   if (userRole === "doctor") {
     markReportAsRead(report.id!);
   }
 
   setSelectedReport(report);
   setPreviewOpen(true);
-
-  const token = localStorage.getItem("token") || "";
-
-  try {
-    const res = await fetch(
-      `http://localhost:8000/api/lab_reports/file/${report.id}`,
-      {
-        headers: { "token-header": `Bearer ${token}` }
-      }
-    );
-
-    if (!res.ok) {
-      console.error("PDF alınamadı:", await res.text());
-      return;
-    }
-
-    const blob = await res.blob();
-
-    if (blob.type !== "application/pdf") {
-      console.error("PDF değil:", blob.type);
-      return;
-    }
-
-    const url = window.URL.createObjectURL(blob);
-    window.open(url, "_blank");
-  } catch (err) {
-    console.error("PDF açılamadı:", err);
-  }
 };
 
   const handleClosePreview = () => {
@@ -145,23 +128,49 @@ const handlePreview = async (report: LabReport) => {
     setCommentText("");
   };
 
-  // Doktor yorum kaydetme
-  const handleDoctorCommentChange = (reportId: number, value: string) => {
-    setEditableReports((prev) =>
-      prev.map((r) => (r.id === reportId ? { ...r, doctor_comment: value } : r))
-    );
-  };
-
-  const handleSaveDoctorComment = async (
-    reportId: number,
-    comment: string
-  ) => {
+  // Doktor yorum kaydetme (genel, API çağıran)
+  const handleSaveDoctorComment = async (reportId: number, comment: string) => {
     try {
       await updateLabReportComment(reportId, comment);
       refreshReports();
     } catch (err: unknown) {
       console.error(err);
       alert("Doktor açıklaması kaydedilemedi!");
+    }
+  };
+
+  // Accordion açma / kapama (doktor)
+  const toggleAccordionForReport = (report: LabReport | null) => {
+    if (!report) {
+      setOpenRowId(null);
+      setAccordionComment("");
+      return;
+    }
+
+    // Eğer aynı rapor açıksa kapat
+    if (openRowId === report.id) {
+      setOpenRowId(null);
+      setAccordionComment("");
+      return;
+    }
+
+    // Açılırken mevcut doktor açıklamasını doldur
+    setOpenRowId(report.id ?? null);
+    setAccordionComment(report.doctor_comment || "");
+  };
+
+  // Accordion içindeki kaydetme butonu
+  const handleSaveAccordion = async (reportId: number) => {
+    try {
+      setSavingAccordionId(reportId);
+      await handleSaveDoctorComment(reportId, accordionComment);
+      setSavingAccordionId(null);
+      setOpenRowId(null);
+      setAccordionComment("");
+    } catch (err) {
+      console.error(err);
+      setSavingAccordionId(null);
+      alert("Kaydederken hata oluştu!");
     }
   };
 
@@ -265,88 +274,143 @@ const handlePreview = async (report: LabReport) => {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ backgroundColor: "#f0f0f0" }}>
+                {userRole === "doctor" && <th style={{ padding: "8px" }}></th>}
                 <th style={{ padding: "8px" }}>Tarih</th>
                 <th style={{ padding: "8px" }}>Dosya</th>
                 <th style={{ padding: "8px" }}>Detay</th>
                 <th style={{ padding: "8px" }}>Yapay Zeka Yorumu</th>
-                <th style={{ padding: "8px" }}>Doktor Açıklaması</th>
+                {/* Sadece citizen (hasta) görsün */}
+{userRole !== "doctor" && (
+<th style={{ padding: "8px" }}>Doktor Açıklaması</th>
+)}
               </tr>
             </thead>
 
             <tbody>
               {filteredReports.map((report) => (
-                <tr
-                  key={report.id}
-                  style={{
-                    backgroundColor:
-                      userRole === "doctor"
-                        ? readReports.includes(report.id!)
-                          ? "white"
-                          : "#ffdddd"
-                        : "white",
-                  }}
-                >
-                  <td style={{ padding: "8px" }}>
-                    {report.upload_date
-                      ? new Date(report.upload_date).toLocaleDateString()
-                      : "-"}
-                  </td>
-
-                  <td style={{ padding: "8px" }}>{report.file_name}</td>
-
-                  <td style={{ padding: "8px" }}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => handlePreview(report)}
-                    >
-                      Göster
-                    </Button>
-                  </td>
-
-                  <td style={{ padding: "8px" }}>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={() => handleOpenComment(report)}
-                      disabled={commentLoadingId === report.id}
-                    >
-                      {commentLoadingId === report.id
-                        ? "⏳ Yükleniyor..."
-                        : "Yorum Al"}
-                    </Button>
-                  </td>
-
-                  <td style={{ padding: "8px" }}>
-                    {userRole === "doctor" ? (
-                      <TextField
-                        value={report.doctor_comment || ""}
-                        onChange={(e) =>
-                          handleDoctorCommentChange(report.id!, e.target.value)
-                        }
-                        multiline
-                        minRows={2}
-                        fullWidth
-                        variant="outlined"
-                        onBlur={() =>
-                          handleSaveDoctorComment(
-                            report.id!,
-                            report.doctor_comment || ""
-                          )
-                        }
-                      />
-                    ) : (
-                      <TextField
-                        value={report.doctor_comment || ""}
-                        multiline
-                        minRows={2}
-                        fullWidth
-                        InputProps={{ readOnly: true }}
-                        variant="outlined"
-                      />
+                <React.Fragment key={report.id}>
+                  <tr
+                    style={{
+                      backgroundColor:
+                        userRole === "doctor"
+                          ? readReports.includes(report.id!) 
+                            ? "white"
+                            : "#ffdddd"
+                          : "white",
+                    }}
+                  >
+                    {/* Doktor için satır başındaki kalem ikonu */}
+                    {userRole === "doctor" && (
+                      <td style={{ padding: "8px", verticalAlign: "top", width: 48 }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => toggleAccordionForReport(report)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      </td>
                     )}
-                  </td>
-                </tr>
+
+                    <td style={{ padding: "8px" }}>
+                      {report.upload_date
+                        ? new Date(report.upload_date).toLocaleDateString()
+                        : "-"}
+                    </td>
+
+                    <td style={{ padding: "8px" }}>{report.file_name}</td>
+
+                    <td style={{ padding: "8px" }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handlePreview(report)}
+                      >
+                        Göster
+                      </Button>
+                    </td>
+
+                    <td style={{ padding: "8px" }}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handleOpenComment(report)}
+                        disabled={commentLoadingId === report.id}
+                      >
+                        {commentLoadingId === report.id
+                          ? "⏳ Yükleniyor..."
+                          : "Yorum Al"}
+                      </Button>
+                    </td>
+
+                    {/* Doktor açıklaması sütunu:
+                        - Hasta: readOnly TextField (aynı görünüm)
+                        - Doktor: plain metin göster (düzenleme accordion ile) */}
+                  {userRole !== "doctor" && (
+<td style={{ padding: "8px", verticalAlign: "top" }}>
+<TextField
+value={report.doctor_comment || ""}
+multiline
+minRows={2}
+fullWidth
+InputProps={{ readOnly: true }}
+variant="outlined"
+/>
+</td>
+)}
+                  </tr>
+
+                  {/* Accordion satırı — sadece doktor için */}
+                  {userRole === "doctor" && openRowId === report.id && (
+                    <tr>
+                      <td colSpan={6}>
+                        <Box
+                          sx={{
+                            mt: 1,
+                            p: 2,
+                            borderRadius: 2,
+                            boxShadow: 1,
+                            backgroundColor: "#f7f9fc",
+                            border: "1px solid #e0e7ef",
+                          }}
+                        >
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                              Açıklama Düzenle
+                            </Typography>
+
+                            <IconButton
+                              size="small"
+                              onClick={() => toggleAccordionForReport(null)}
+                            >
+                              <CloseIcon />
+                            </IconButton>
+                          </Box>
+
+                          <TextField
+                            label="Doktor Açıklaması"
+                            multiline
+                            minRows={4}
+                            fullWidth
+                            value={accordionComment}
+                            onChange={(e) => setAccordionComment(e.target.value)}
+                            variant="outlined"
+                          />
+
+                          <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+                            <Button
+                              variant="contained"
+                              onClick={() => handleSaveAccordion(report.id!)}
+                              disabled={savingAccordionId === report.id}
+                              sx={{ bgcolor: primaryColor, "&:hover": { bgcolor: "#082147" } }}
+                            >
+                              {savingAccordionId === report.id ? "Kaydediliyor..." : "Kaydet"}
+                            </Button>
+                          </Box>
+                        </Box>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
@@ -354,16 +418,40 @@ const handlePreview = async (report: LabReport) => {
       </Paper>
 
       {/* PDF Modal */}
-      <Dialog open={previewOpen} onClose={handleClosePreview} maxWidth="md" fullWidth>
-        <DialogTitle>PDF İçeriği</DialogTitle>
-        <DialogContent>
-          {selectedReport ? (
-            <TestsTable parsedData={selectedReport.parsed_data} />
-          ) : (
-            <Typography>Yükleniyor...</Typography>
-          )}
-        </DialogContent>
-      </Dialog>
+<Dialog open={previewOpen} onClose={handleClosePreview} maxWidth="md" fullWidth>
+
+  <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    PDF İçeriği
+
+    <Box sx={{ display: "flex", gap: 1 }}>
+      {/* PDF İndir Butonu */}
+      <Button
+        variant="outlined"
+        onClick={() =>
+          window.open(
+            `http://localhost:8000/api/lab_reports/file/${selectedReport?.id}`
+          )
+        }
+      >
+        PDF İndir
+      </Button>
+
+      {/* Kapatma (X) */}
+      <IconButton onClick={handleClosePreview}>
+        <CloseIcon />
+      </IconButton>
+    </Box>
+  </DialogTitle>
+
+  <DialogContent>
+    {selectedReport ? (
+      <TestsTable parsedData={selectedReport.parsed_data} />
+    ) : (
+      <Typography>Yükleniyor...</Typography>
+    )}
+  </DialogContent>
+
+</Dialog>
 
       {/* Yorum Modal */}
       <Dialog open={commentOpen} onClose={handleCloseComment} maxWidth="sm" fullWidth>

@@ -1,6 +1,7 @@
 // src/services/PatientApi.ts
 import { User } from "../types/Staff";
 import { LabReport } from "../types/LabReport";
+import { MyDoctor } from "../types/Doctor";
 
 const BASE_URL = "http://localhost:8000/api/patients";
 
@@ -22,29 +23,27 @@ export async function getDoctors(): Promise<Doctor[]> {
 }
 
 // Hasta kendi doktoru
-export async function getMyDoctorStatus(): Promise<Doctor | null> {
+export async function getMyDoctors(): Promise<MyDoctor[]> {
   const token = localStorage.getItem("token") || "";
   const res = await fetch(`${BASE_URL}/my-doctor`, {
     headers: { "token-header": `Bearer ${token}` },
   });
-  if (!res.ok) return null;
+
+  if (!res.ok) return [];
 
   const data = await res.json();
-  // Backend array dönüyor, tek doktor varsayımıyla alıyoruz
-  const doctor = data[0]; 
-  if (!doctor) return null;
 
-  return {
-    id: doctor.doctor_id,
-    name: doctor.doctor_name,
-    email: doctor.doctor_email,
-    specialty: doctor.specialty || "", // eğer backend vermiyorsa boş
-    phone: doctor.phone || "",         // eğer backend vermiyorsa boş
+  // Backend array döndürüyor, her doctor için MyDoctor objesi oluştur
+  return data.map((doctor: any) => ({
+    id: doctor.doctor_id,           // zorunlu
+    name: doctor.doctor_name,       // zorunlu
+    email: doctor.doctor_email,     // zorunlu
+    specialty: doctor.specialty || "",
+    phone: doctor.phone || "",
     status: doctor.status as "bekliyor" | "onaylandı" | "reddedildi",
     note: doctor.note || "",
-  };
+  }));
 }
-
 // Doktor seç
 export async function requestDoctor(payload: { doctor_id: number; note?: string }) {
   const token = localStorage.getItem("token") || "";

@@ -1,4 +1,5 @@
 // components/users/UserTable.tsx
+"use client";
 import React, { useMemo, useState } from "react";
 import { DataGrid, GridColDef, GridRenderCellParams } from "@mui/x-data-grid";
 import { Box, Stack, IconButton, TextField, MenuItem, Typography, Paper } from "@mui/material";

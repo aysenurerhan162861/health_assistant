@@ -1,7 +1,11 @@
+"use client";
+
 import React from "react";
 import { AppBar, Toolbar, Typography, Button, Box } from "@mui/material";
 import { useRouter } from "next/router";
 import NotificationPanel from "../doctors/NotificationPanel";
+import MessageNotificationPanel from "../ayarlar/MessageNotificationPanel";
+
 
 const Navbar: React.FC = () => {
   const router = useRouter();
@@ -26,7 +30,10 @@ const Navbar: React.FC = () => {
         </Typography>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          
           <NotificationPanel />
+            {/* Mesaj bildirimleri */}
+          <MessageNotificationPanel />
 
           <Button color="inherit" onClick={handleLogout}>
             Çıkış Yap

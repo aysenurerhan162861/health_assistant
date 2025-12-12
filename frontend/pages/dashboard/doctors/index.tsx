@@ -10,6 +10,8 @@ const DoctorsPage: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const openDoctorId = router.query.openChat ? Number(router.query.openChat) : undefined;
+
   useEffect(() => {
     async function fetchUser() {
       try {
@@ -25,14 +27,13 @@ const DoctorsPage: React.FC = () => {
     fetchUser();
   }, [router]);
 
-  if (loading) return <CircularProgress />; // Yükleniyorken spinner göster
-
-  if (!user) return null; // Eğer user yoksa boş dön
+  if (loading) return <CircularProgress />;
+  if (!user) return null;
 
   return (
     <Layout user={user}>
       <Box sx={{ mt: 10, mx: 3 }}>
-        <PatientDoctors />
+        <PatientDoctors openDoctorId={openDoctorId} />
       </Box>
     </Layout>
   );

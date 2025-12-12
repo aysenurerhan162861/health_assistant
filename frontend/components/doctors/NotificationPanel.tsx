@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Box,
   List,
@@ -11,20 +11,51 @@ import {
 } from "@mui/material";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import CloseIcon from "@mui/icons-material/Close";
-import {
-  getNotifications,
-  markNotificationRead,
-} from "@/services/NotificationHistoryApi";
+import { getNotifications, markNotificationRead } from "@/services/NotificationHistoryApi";
 import { NotificationHistory } from "@/types/NotificationHistory";
 import { useRouter } from "next/navigation";
 
 const NotificationPanel: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationHistory[]>([]);
   const [open, setOpen] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     fetchNotifications();
+    let isMounted = true;
+
+    const connectWebSocket = () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}/ws/chat?token=${token}`);
+      wsRef.current = ws;
+
+      ws.onopen = () => console.log("Notification WebSocket connected");
+      ws.onmessage = (event) => {
+        if (!isMounted) return;
+        const data = JSON.parse(event.data);
+        if (data.type === "notification") {
+          setNotifications((prev) => [data, ...prev]);
+        }
+      };
+      ws.onclose = () => {
+        console.log("WebSocket disconnected, reconnecting in 3s...");
+        setTimeout(connectWebSocket, 3000);
+      };
+      ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        ws.close();
+      };
+    };
+
+    connectWebSocket();
+
+    return () => {
+      isMounted = false;
+      wsRef.current?.close();
+    };
   }, []);
 
   const fetchNotifications = async () => {
@@ -34,45 +65,29 @@ const NotificationPanel: React.FC = () => {
 
   const handleNotificationClick = async (n: NotificationHistory) => {
     await markNotificationRead(n.id);
-
-    // frontend güncellemesi
     setNotifications((prev) =>
       prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
     );
 
-    // -------------------------
-    // ROL AL → HASTA / DOKTOR
-    // -------------------------
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const role = storedUser.role;
-
     let target = "/dashboard";
 
-    // -------------------------
-    // 🔥 DOKTOR YÖNLENDİRMELERİ
-    // -------------------------
     if (role === "doctor") {
       switch (n.event_name) {
         case "lab_uploaded":
         case "lab_report_uploaded":
-          target = "/dashboard/doctors/labs";
-          break;
-
-        case "patient_selected_doctor":
-        case "patient_added_doctor":
-          target = "/dashboard/patients/pending";
-          break;
-
         case "doctor_comment":
         case "lab_comment_added":
           target = "/dashboard/doctors/labs";
           break;
+        case "patient_selected_doctor":
+        case "patient_added_doctor":
+          target = "/dashboard/patients/pending";
+          break;
       }
     }
 
-    // -------------------------
-    // 🔥 HASTA YÖNLENDİRMELERİ
-    // -------------------------
     if (role === "citizen") {
       switch (n.event_name) {
         case "doctor_commented_lab":
@@ -82,7 +97,6 @@ const NotificationPanel: React.FC = () => {
       }
     }
 
-    // Metadata override
     if (n.event_metadata?.target_url) {
       target = n.event_metadata.target_url;
     }
@@ -118,15 +132,7 @@ const NotificationPanel: React.FC = () => {
             backdropFilter: "blur(4px)",
           }}
         >
-          {/* X Button */}
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "flex-end",
-              px: 1,
-              pb: 1,
-            }}
-          >
+          <Box sx={{ display: "flex", justifyContent: "flex-end", px: 1, pb: 1 }}>
             <IconButton
               size="small"
               onClick={() => setOpen(false)}
@@ -155,9 +161,7 @@ const NotificationPanel: React.FC = () => {
                       borderRadius: "8px",
                       mb: 1,
                       border: "1px solid #ddd",
-                      "&:hover": {
-                        bgcolor: n.read ? "#ececec" : "#e2e2e2",
-                      },
+                      "&:hover": { bgcolor: n.read ? "#ececec" : "#e2e2e2" },
                       transition: "background 0.2s ease",
                     }}
                   >
@@ -168,9 +172,7 @@ const NotificationPanel: React.FC = () => {
                         fontWeight: n.read ? "normal" : "600",
                         color: "#333",
                       }}
-                      secondaryTypographyProps={{
-                        color: "#666",
-                      }}
+                      secondaryTypographyProps={{ color: "#666" }}
                     />
                   </ListItemButton>
                 </ListItem>

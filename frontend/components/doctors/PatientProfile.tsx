@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import { Box, Paper, Typography, Avatar, Divider, Stack } from "@mui/material";
 import CitizenForm from "../forms/CitizenForm";

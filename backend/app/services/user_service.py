@@ -179,3 +179,7 @@ def create_staff_user(db: Session, name: str, email: str, role: str, parent_id: 
     )
 
     return new_user
+
+
+def get_user_by_email(db: Session, email: str):
+    return db.query(User).filter(User.email == email).first()

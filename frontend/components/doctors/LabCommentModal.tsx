@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
   Tabs,
   Tab,
   Box,
@@ -133,28 +134,43 @@ const LabCommentModal: React.FC<LabCommentModalProps> = ({
           )}
 
           {/* TAB 2 */}
-          {tabIndex === 2 && (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <TextField
-                label="Doktor Açıklaması"
-                multiline
-                minRows={5}
-                fullWidth
-                value={doctorComment}
-                onChange={(e) => setDoctorComment(e.target.value)}
-              />
+{tabIndex === 2 && (
+  <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <Box sx={{ flex: 1 }}>
+      <TextField
+        label="Doktor Açıklaması"
+        multiline
+        minRows={5}
+        fullWidth
+        value={doctorComment}
+        onChange={(e) => setDoctorComment(e.target.value)}
+      />
+    </Box>
 
-              <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
-                <Button variant="contained" onClick={handleSaveComment} disabled={saving}>
-                  {saving ? "Kaydediliyor..." : "Kaydet"}
-                </Button>
+    {/* Sağ alt köşeye sabitlenen butonlar */}
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "flex-end",
+        gap: 1,
+        mt: 2,
+      }}
+    >
+      <Button
+        variant="contained"
+        onClick={handleSaveComment}
+        disabled={saving}
+      >
+        {saving ? "Kaydediliyor..." : "Kaydet"}
+      </Button>
 
-                <Button variant="outlined" onClick={onClose}>
-                  Kapat
-                </Button>
-              </Box>
-            </Box>
-          )}
+      <Button variant="outlined" onClick={onClose}>
+        Kapat
+      </Button>
+    </Box>
+  </Box>
+)}
+
         </Box>
       </DialogContent>
     </Dialog>

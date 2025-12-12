@@ -3,6 +3,7 @@ from app.utils.email_service import send_email
 from sqlalchemy.orm import Session
 from typing import Dict
 import json
+from app.controllers.chat_socket_controller import notify_via_ws
 
 # 🔹 FCM gönderimi placeholder
 # Gerçek proje için firebase_admin SDK ile değiştirilebilir
@@ -63,7 +64,7 @@ def notify(
     db.commit()
 
 
-def notify_event(
+async def notify_event(
     db: Session,
     user_id: int,
     event_name: str,
@@ -71,18 +72,29 @@ def notify_event(
     body: str,
     extra_data: dict = None
 ):
-    """
-    Basit bildirim fonksiyonu. Veritabanına kaydediyor.
-    """
+    from app.controllers.chat_socket_controller import notify_via_ws
+
     notif = NotificationHistory(
         user_id=user_id,
         event_name=event_name,
         title=title,
         body=body,
-        extra_data=extra_data # extra_data kullanıyoruz
+        extra_data=extra_data
     )
     db.add(notif)
     db.commit()
     db.refresh(notif)
+
     print(f"Bildirim gönderildi: {title} -> {body}")
+
+    # 🌟 Async WebSocket çağrısı
+    await notify_via_ws(user_id, {
+        "type": "notification",
+        "event": event_name,
+        "title": title,
+        "body": body,
+        "extra_data": extra_data,
+        "id": notif.id,
+        "created_at": notif.created_at.isoformat()
+    })
     return notif

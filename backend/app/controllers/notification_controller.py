@@ -122,3 +122,4 @@ def mark_notification_read(notification_id: int,
     notif.read = True
     db.commit()
     return {"message": "OK"}
+
