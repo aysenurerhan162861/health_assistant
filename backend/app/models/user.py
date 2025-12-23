@@ -53,3 +53,6 @@ class User(Base):
 
      # LabReport ilişkisi
     lab_reports = relationship("LabReport", back_populates="patient", cascade="all, delete-orphan")
+    
+    # BloodPressureTracking ilişkisi
+    blood_pressure_trackings = relationship("BloodPressureTracking", back_populates="patient", cascade="all, delete-orphan")

@@ -13,6 +13,7 @@ export interface User {
   age?: number;
   gender?: string;
   lab_reports?: LabReport[];
+  note?: string;
 
 
 }

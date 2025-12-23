@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { Box, Button, TextField, Typography, Paper, List, ListItem } from "@mui/material";
-import { connectWebSocket, sendMessage } from "@/services/ChatApi";
+import { Box, Button, TextField, Typography, Paper } from "@mui/material";
+import { connectWebSocket, sendMessage, disconnectWebSocket } from "@/services/ChatApi";
 
 interface ChatMessage {
   id: number;
@@ -19,13 +19,14 @@ interface ChatWindowProps {
   role: "doctor" | "patient";
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ room, senderId, receiverId }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ room, senderId, receiverId, role }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const doctorId = Math.max(senderId, receiverId);
-  const patientId = Math.min(senderId, receiverId);
+  // Doktor ve hasta id'sini rol bilgisine göre net belirle (string gelirse number'a çevir)
+  const doctorId = role === "doctor" ? Number(senderId) : Number(receiverId);
+  const patientId = role === "doctor" ? Number(receiverId) : Number(senderId);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -35,36 +36,59 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ room, senderId, receiverId }) =
 
   // 🔥 WEBSOCKET
   useEffect(() => {
+    console.log("ChatWindow: Connecting WebSocket", { room, doctorId, patientId, senderId, receiverId, role });
+    
     connectWebSocket(
       room,
 
       // 📩 MESAJ GELDİ
       (raw: string) => {
-        const data = JSON.parse(raw);
+        try {
+          const data = JSON.parse(raw);
+          console.log("ChatWindow: Received message", data.type, data);
 
-        if (data.type === "message") {
-          setMessages((prev) =>
-            prev.some((m) => m.id === data.id) ? prev : [...prev, data]
-          );
-        }
+          if (data.type === "message") {
+            setMessages((prev) =>
+              prev.some((m) => m.id === data.id) ? prev : [...prev, data]
+            );
+          }
 
-        if (data.type === "history") {
-          setMessages(data.messages);
+          if (data.type === "history") {
+            console.log("ChatWindow: History received", data.messages?.length || 0, "messages");
+            setMessages(data.messages || []);
+          }
+
+          // Bildirim tipini mesaj listesine karıştırma
+          if (data.type === "notification") {
+            return;
+          }
+        } catch (err) {
+          console.error("ChatWindow: Parse error", err, raw);
         }
       },
 
       // 📌 BAĞLANINCA history iste
       () => {
-        const historyPayload = {
-          type: "history",
-          doctor_id: doctorId,
-          patient_id: patientId,
-        };
-
-        sendMessage(JSON.stringify(historyPayload));
+        console.log("ChatWindow: WebSocket opened, requesting history", { doctorId, patientId });
+        // WebSocket açıldıktan sonra kısa bir gecikme ile history isteği gönder
+        setTimeout(() => {
+          const historyPayload = {
+            type: "history",
+            doctor_id: doctorId,
+            patient_id: patientId,
+          };
+          console.log("ChatWindow: Sending history request", historyPayload);
+          sendMessage(JSON.stringify(historyPayload));
+        }, 200);
       }
     );
-  }, [room, doctorId, patientId]);
+
+    // Cleanup: önceki bağlantıyı kapat
+    return () => {
+      console.log("ChatWindow: Cleaning up WebSocket");
+      disconnectWebSocket();
+    };
+  }, [room, doctorId, patientId, senderId, receiverId, role]);
 
   // 📤 MESAJ GÖNDERME
   const handleSend = () => {
@@ -91,42 +115,46 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ room, senderId, receiverId }) =
         Sohbet
       </Typography>
 
-      <List sx={{ maxHeight: 320, overflowY: "auto", pr: 1 }}>
-        {messages.map((msg) => (
-          <ListItem
-            key={msg.id}
-            sx={{
-              justifyContent: msg.sender_id === senderId ? "flex-end" : "flex-start",
-              display: "flex",
-            }}
-          >
+      <Box sx={{ maxHeight: 320, overflowY: "auto", pr: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+        {messages.map((msg) => {
+          const isOwnMessage = msg.sender_id === senderId;
+          return (
             <Box
+              key={msg.id}
               sx={{
-                bgcolor: msg.sender_id === senderId ? "#0a2d57" : "#e0e0e0",
-                color: msg.sender_id === senderId ? "#fff" : "#000",
-                p: 1.3,
-                borderRadius: 2,
-                maxWidth: "70%",
-                wordBreak: "break-word",
+                display: "flex",
+                justifyContent: isOwnMessage ? "flex-end" : "flex-start",
+                width: "100%",
               }}
             >
-              <Typography variant="body2">{msg.text}</Typography>
-              <Typography
-                variant="caption"
+              <Box
                 sx={{
-                  display: "block",
-                  textAlign: "right",
-                  mt: 0.5,
-                  opacity: 0.8,
+                  bgcolor: isOwnMessage ? "#0a2d57" : "#e0e0e0",
+                  color: isOwnMessage ? "#fff" : "#000",
+                  p: 1.3,
+                  borderRadius: 2,
+                  maxWidth: "70%",
+                  wordBreak: "break-word",
                 }}
               >
-                {msg.sender_id === senderId ? "Sen" : msg.sender_name}
-              </Typography>
+                <Typography variant="body2">{msg.text}</Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: "block",
+                    textAlign: "right",
+                    mt: 0.5,
+                    opacity: 0.8,
+                  }}
+                >
+                  {isOwnMessage ? "Sen" : msg.sender_name}
+                </Typography>
+              </Box>
             </Box>
-          </ListItem>
-        ))}
+          );
+        })}
         <div ref={messagesEndRef} />
-      </List>
+      </Box>
 
       <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
         <TextField

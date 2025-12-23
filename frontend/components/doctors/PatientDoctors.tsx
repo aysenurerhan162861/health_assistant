@@ -1,7 +1,7 @@
 // components/doctors/PatientDoctors.tsx
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Paper,
@@ -22,20 +22,11 @@ import {
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import { getDoctors, requestDoctor, getMyDoctors, deleteDoctor } from "../../services/PatientApi";
 import { User } from "../../types/Staff";
-import { connectWebSocket, sendMessage } from "@/services/ChatApi";
 import ChatWindow from "@/components/message/ChatWindow";
 
 interface MyDoctor extends User {
   status: "bekliyor" | "onaylandı" | "reddedildi";
   note?: string;
-}
-
-interface ChatMessage {
-  id: number;
-  sender_id: number;
-  sender_name: string;
-  text: string;
-  created_at: string;
 }
 
 interface PatientDoctorsProps {
@@ -52,16 +43,23 @@ const PatientDoctors: React.FC<PatientDoctorsProps> = ({ openDoctorId }) => {
   const [filterBy, setFilterBy] = useState<"name" | "email" | "status">("name");
   const [chatOpen, setChatOpen] = useState(false);
   const [currentDoctor, setCurrentDoctor] = useState<MyDoctor | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [patientId, setPatientId] = useState<number>(0);
   const primaryColor = "#0a2d57";
-  const patientId = Number(localStorage.getItem("user_id") || 0);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-  useEffect(scrollToBottom, [messages]);
+  // localStorage'dan hasta ID'sini al
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        try {
+          const userObj = JSON.parse(userStr);
+          setPatientId(Number(userObj.id) || 0);
+        } catch (err) {
+          console.error("user parse hatası:", err);
+        }
+      }
+    }
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -117,77 +115,6 @@ const PatientDoctors: React.FC<PatientDoctorsProps> = ({ openDoctorId }) => {
   const handleMessageDoctor = (doctor: MyDoctor) => {
     setCurrentDoctor(doctor);
     setChatOpen(true);
-
-    const room = `chat_${Math.min(patientId, doctor.id)}_${Math.max(patientId, doctor.id)}`;
-
-    connectWebSocket(
-      room,
-      (msg: string) => {
-        try {
-          const data = JSON.parse(msg);
-          if (data.type === "message") {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: data.id,
-                sender_id: data.sender_id,
-                sender_name: data.sender_name,
-                text: data.text,
-                created_at: data.created_at,
-              },
-            ]);
-          } else if (data.type === "history") {
-            setMessages(
-              data.messages.map((m: any) => ({
-                id: m.id,
-                sender_id: m.sender_id,
-                sender_name: m.sender_name,
-                text: m.text,
-                created_at: m.created_at,
-              }))
-            );
-          }
-        } catch (err) {
-          console.error("Mesaj parse edilemedi:", err);
-        }
-      },
-      () => {
-        sendMessage(
-          JSON.stringify({
-            type: "history",
-            doctor_id: doctor.id,
-            patient_id: patientId,
-          })
-        );
-      },
-      () => console.log("WS CLOSE")
-    );
-  };
-
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !currentDoctor) return;
-
-    const payload = {
-      type: "message",
-      doctor_id: currentDoctor.id,
-      patient_id: patientId,
-      text: newMessage,
-    };
-
-    sendMessage(JSON.stringify(payload));
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        sender_id: patientId,
-        sender_name: "Sen",
-        text: newMessage,
-        created_at: new Date().toISOString(),
-      },
-    ]);
-
-    setNewMessage("");
   };
 
   const columns: GridColDef[] = [
@@ -354,7 +281,7 @@ const PatientDoctors: React.FC<PatientDoctorsProps> = ({ openDoctorId }) => {
   <DialogContent>
     {currentDoctor && (
       <ChatWindow
-        room={`doctor_${currentDoctor.id}_patient_${patientId}`}
+        room={`chat_${Math.min(patientId, currentDoctor.id)}_${Math.max(patientId, currentDoctor.id)}`}
         senderId={patientId}
         receiverId={currentDoctor.id}
         role="patient"

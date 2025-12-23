@@ -20,8 +20,11 @@ export default function App({ Component, pageProps }: AppProps) {
     // FCM token alma
     requestFirebaseNotificationPermission()
       .then((token) => {
-        if (token) console.log("FCM token:", token);
-        else console.log("Token alınamadı veya izin verilmedi.");
+        if (token) {
+          console.log("FCM token:", token);
+        } else {
+          console.log("Token alınamadı veya izin verilmedi.");
+        }
       })
       .catch((err) => console.log("Token alma hatası:", err));
   }, []);

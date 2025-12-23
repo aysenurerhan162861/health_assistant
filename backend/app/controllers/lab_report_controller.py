@@ -74,7 +74,7 @@ def list_patient_reports(patient_id: int, db: Session = Depends(get_db)):
 # Doktor açıklama ekliyor
 # -----------------------------
 @router.patch("/update_comment/{report_id}", response_model=LabReportResponse)
-def update_comment(
+async def update_comment(
     report_id: int,
     comment_data: LabReportUpdateComment,
     db: Session = Depends(get_db),
@@ -89,12 +89,13 @@ def update_comment(
     db.refresh(report)
 
     # 🔔 Bildirim: Hasta için
-    notify_event(
+    await notify_event(
         db=db,
         user_id=report.patient_id,
         event_name="doctor_comment",
         title="Doktor Yorum Ekledi",
-        body=f"{current_user.name} tahliliniz için yorum yaptı."
+        body=f"{current_user.name} tahliliniz için yorum yaptı.",
+        extra_data={"lab_report_id": report.id}
     )
 
     return report

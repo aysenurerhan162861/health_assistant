@@ -3,6 +3,7 @@ import React, { ReactNode, useEffect, useState } from "react";
 import { Box } from "@mui/material";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
+import HealthChatbot from "../chatbot/HealthChatbot";
 
 interface LayoutProps {
   user?: Partial<User> | null; // tüm alanları opsiyonel yap
@@ -36,6 +37,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <Navbar />
         <Box sx={{ p: 3, flexGrow: 1 }}>{children}</Box>
       </Box>
+
+      {/* Chatbot */}
+      <HealthChatbot />
     </Box>
   );
 };

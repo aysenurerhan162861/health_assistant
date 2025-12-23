@@ -2,7 +2,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { Box, Avatar, Typography, CircularProgress } from "@mui/material";
-import { User } from "../../types/User";
+import { User } from "../../types/user";
 import { getPatient } from "../../services/PatientApi";
 
 interface Props {

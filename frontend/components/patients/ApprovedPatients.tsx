@@ -30,6 +30,8 @@ import {
 import { User } from "../../types/Staff";
 import PatientCardModal from "./PatientCardContent";
 import ChatWindow from "../message/ChatWindow";
+import NutritionTrendsView from "../trends/NutritionTrendsView";
+import { useRouter } from "next/navigation";
 
 // 🔥 EKLENDİ
 import { useSearchParams } from "next/navigation";
@@ -356,10 +358,10 @@ const ApprovedPatients: React.FC = () => {
               doctorId &&
               typeof window !== "undefined" && (
                 <ChatWindow
-                  room={`doctor_${doctorId}_patient_${selectedPatient.id}`}
+                  room={`chat_${Math.min(doctorId, selectedPatient.id)}_${Math.max(doctorId, selectedPatient.id)}`}
                   senderId={doctorId}
                   receiverId={selectedPatient.id}
-                  role = "doctor"
+                  role="doctor"
                 />
               )}
           </Box>

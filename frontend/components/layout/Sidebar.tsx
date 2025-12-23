@@ -22,6 +22,7 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import SettingsIcon from "@mui/icons-material/Settings";
 import PeopleIcon from "@mui/icons-material/People";
+import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import axios from "axios";
@@ -117,11 +118,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
       ],
     },
     { text: "Tahliller", icon: <ScienceIcon fontSize="small" />, href: "/dashboard/doctors/labs" },
+    { text: "Öğün Analizi", icon: <RestaurantIcon fontSize="small" />, href: "/dashboard/doctors/meals" },
+    { text: "Tansiyon", icon: <MonitorHeartIcon fontSize="small" />, href: "/dashboard/doctors/blood-pressure" },
   ];
 
   const patientItems: MenuItem[] = [
     { text: "Doktorlar", icon: <PeopleIcon fontSize="small" />, href: "/dashboard/doctors" },
     { text: "Tahlillerim", icon: <ScienceIcon fontSize="small" />, href: "/tahlil" },
+    { text: "Öğün Analizi", icon: <RestaurantIcon fontSize="small" />, href: "/ogun" },
+    { text: "Tansiyon", icon: <MonitorHeartIcon fontSize="small" />, href: "/tansiyon" },
   ];
 
   const staffItems: MenuItem[] = [
@@ -129,7 +134,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
   ];
 
   const commonItems: MenuItem[] = [
-    { text: "Öğün Ekle", icon: <RestaurantIcon fontSize="small" />, href: "/ogun-ekle" },
     { text: "MR Analizi", icon: <FavoriteIcon fontSize="small" />, href: "/mr-analizi" },
     { text: "Trendler", icon: <TrendingUpIcon fontSize="small" />, href: "/trendler" },
     { text: "Ayarlar", icon: <SettingsIcon fontSize="small" />, href: "/ayarlar" },

@@ -64,12 +64,19 @@ const MessageNotificationPanel: React.FC = () => {
         const senderId = data.sender_id;
         const senderName = data.sender_name;
 
+        // Eğer mesaj kendisinden geliyorsa (gönderen), sayı artırmamalı
+        // Sadece alıcı için sayı artmalı
+        if (senderId === userId) {
+          // Mesaj kendisinden geldi, sayı artırmadan sadece listeyi güncelle
+          return;
+        }
+
         setLastSenders((prev) => {
           const exists = prev.find((s) => s.sender_id === senderId);
           if (exists) {
             return prev.map((s) =>
               s.sender_id === senderId
-                ? { ...s, unread_count: s.unread_count + 1 }
+                ? { ...s, unread_count: (s.unread_count || 0) + 1 }
                 : s
             );
           } else {
@@ -79,6 +86,12 @@ const MessageNotificationPanel: React.FC = () => {
             ];
           }
         });
+        
+        // Mesaj geldiğinde listeyi yeniden çek (güncel sayıları almak için)
+        // Kısa bir gecikme ile çek ki backend'de kayıt tamamlansın
+        setTimeout(() => {
+          fetchLastSenders();
+        }, 500);
       }
     };
 

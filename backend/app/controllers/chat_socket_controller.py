@@ -5,7 +5,7 @@ import json
 from typing import Dict, Optional, Set
 from app.models.message import Message
 from app.models.user import User
-from app.services.chat_service import save_message, get_history_by_room, get_last_senders
+from app.services.chat_service import save_message, get_history_by_room, get_last_senders, get_history_by_users
 from app.services.user_service import get_user_by_email
 from app.utils.auth import verify_token
 from app.database import get_db
@@ -111,22 +111,28 @@ async def chat_socket(websocket: WebSocket, db: Session = Depends(get_db)):
                     "created_at": getattr(saved, "created_at", None).isoformat() if getattr(saved, "created_at", None) else None
                 }
 
-                # Her iki tarafı bilgilendir
+                # Her iki tarafı bilgilendir (mesaj sayısı için type: "message")
+                # Bu mesaj MessageNotificationPanel'de görünecek
                 recv_ids: Set[int] = {doctor_id, patient_id}
                 for rid in recv_ids:
                     target_ws = active_connections.get(rid)
                     if target_ws:
                         await target_ws.send_text(json.dumps(payload_out))
+                
+                # NOT: Mesaj bildirimleri için notify() çağırmıyoruz
+                # Çünkü mesaj bildirimleri MessageNotificationPanel'de görünmeli
+                # Normal bildirimler (lab_uploaded, meal_uploaded, vb.) NotificationPanel'de görünür
 
             elif msg_type == "history":
                 doctor_id = int(data.get("doctor_id"))
                 patient_id = int(data.get("patient_id"))
-                room = make_room(doctor_id, patient_id)
-                msgs = get_history_by_room(room)
+                print(f"History request: doctor_id={doctor_id}, patient_id={patient_id}, user_id={user_id}, role={role}")
+                # İki yönlü geçmiş: (doctor->patient) OR (patient->doctor)
+                msgs = get_history_by_users(doctor_id, patient_id)
+                print(f"Found {len(msgs)} messages in history")
 
                 out_msgs = [{
                     "id": m.id,
-                    "room": m.room,
                     "sender_id": m.sender_id,
                     "sender_name": m.sender_name,
                     "receiver_id": m.receiver_id,
@@ -138,6 +144,7 @@ async def chat_socket(websocket: WebSocket, db: Session = Depends(get_db)):
                     "type": "history",
                     "messages": out_msgs
                 }))
+                print(f"History sent: {len(out_msgs)} messages")
 
     except WebSocketDisconnect:
         if user_id in active_connections:

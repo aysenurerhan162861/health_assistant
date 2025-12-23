@@ -16,9 +16,9 @@ router = APIRouter(
 def get_settings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Role bazlı default eventler
     if current_user.role == "doctor":
-        default_events = ["lab_uploaded", "patient_selected_doctor"]
+        default_events = ["lab_uploaded", "patient_selected_doctor", "meal_uploaded", "doctor_comment", "blood_pressure_completed"]
     else:  # hasta
-        default_events = ["lab_uploaded", "doctor_comment", "patient_selected_doctor"]
+        default_events = ["lab_uploaded", "doctor_comment", "patient_selected_doctor", "meal_uploaded", "blood_pressure_completed"]
 
     # Kullanıcının kayıtlı ayarlarını al
     settings = db.query(NotificationSetting).filter(NotificationSetting.user_id == current_user.id).all()

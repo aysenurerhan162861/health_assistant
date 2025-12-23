@@ -24,7 +24,7 @@ def register_user(db: Session, user_data: UserCreate):
         name=user_data.name,
         email=user_data.email,
         password=hashed_pw,
-        role=user_data.role,
+        role=user_data.role.upper(),
         diploma_number=user_data.diploma_number,
         workplace=user_data.workplace,
         specialization=user_data.specialization,

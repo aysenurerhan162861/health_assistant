@@ -5,7 +5,6 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
   Tabs,
   Tab,
   Box,
@@ -35,15 +34,12 @@ const LabCommentModal: React.FC<LabCommentModalProps> = ({
   const [tabIndex, setTabIndex] = useState(0);
   const [doctorComment, setDoctorComment] = useState("");
   const [saving, setSaving] = useState(false);
-
   const [patientReports, setPatientReports] = useState<LabReport[]>([]);
 
-  // ✔️ labReport değişince doktor notunu güncelle
   useEffect(() => {
     setDoctorComment(labReport?.doctor_comment || "");
   }, [labReport]);
 
-  // ✔️ Hook her zaman çağrılır → içeride koşullu kontrol var
   useEffect(() => {
     const fetchReports = async () => {
       if (!labReport?.patient?.id) {
@@ -63,7 +59,6 @@ const LabCommentModal: React.FC<LabCommentModalProps> = ({
     fetchReports();
   }, [labReport]);
 
-  // ❗️return null en ALTA alındı → hook sırası bozulmuyor
   if (!labReport) return null;
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -89,17 +84,17 @@ const LabCommentModal: React.FC<LabCommentModalProps> = ({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle
-  sx={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  }}
->
-  Detaylar
-  <IconButton onClick={onClose}>
-    <CloseIcon />
-  </IconButton>
-</DialogTitle>
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        Detaylar
+        <IconButton onClick={onClose}>
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
 
       <DialogContent
         sx={{
@@ -121,9 +116,11 @@ const LabCommentModal: React.FC<LabCommentModalProps> = ({
         {/* İçerik */}
         <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>
           {/* TAB 0 */}
-          {tabIndex === 0 && <PatientCardContent patient={labReport.patient} />}
+          {tabIndex === 0 && (
+            <PatientCardContent patient={labReport.patient} />
+          )}
 
-          {/* TAB 1 - Hastanın tüm tahlilleri */}
+          {/* TAB 1 */}
           {tabIndex === 1 && (
             <ReportList
               reports={patientReports}
@@ -133,45 +130,59 @@ const LabCommentModal: React.FC<LabCommentModalProps> = ({
             />
           )}
 
-          {/* TAB 2 */}
-{tabIndex === 2 && (
-  <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
-    <Box sx={{ flex: 1 }}>
-      <TextField
-        label="Doktor Açıklaması"
-        multiline
-        minRows={5}
-        fullWidth
-        value={doctorComment}
-        onChange={(e) => setDoctorComment(e.target.value)}
-      />
-    </Box>
+          {/* TAB 2 (AYNEN KALDI) */}
+          {tabIndex === 2 && (
+            <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  label="Doktor Açıklaması"
+                  multiline
+                  minRows={5}
+                  fullWidth
+                  value={doctorComment}
+                  onChange={(e) => setDoctorComment(e.target.value)}
+                />
+              </Box>
 
-    {/* Sağ alt köşeye sabitlenen butonlar */}
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent: "flex-end",
-        gap: 1,
-        mt: 2,
-      }}
-    >
-      <Button
-        variant="contained"
-        onClick={handleSaveComment}
-        disabled={saving}
-      >
-        {saving ? "Kaydediliyor..." : "Kaydet"}
-      </Button>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 1,
+                  mt: 2,
+                }}
+              >
+                <Button
+                  variant="contained"
+                  onClick={handleSaveComment}
+                  disabled={saving}
+                >
+                  {saving ? "Kaydediliyor..." : "Kaydet"}
+                </Button>
 
-      <Button variant="outlined" onClick={onClose}>
-        Kapat
-      </Button>
-    </Box>
-  </Box>
-)}
-
+                <Button variant="outlined" onClick={onClose}>
+                  Kapat
+                </Button>
+              </Box>
+            </Box>
+          )}
         </Box>
+
+        {/* 🔹 TAB 0 ve TAB 1 için sağ alt Kapat butonu */}
+        {(tabIndex === 0 || tabIndex === 1) && (
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "flex-end",
+              p: 2,
+              borderTop: "1px solid #eee",
+            }}
+          >
+            <Button variant="outlined" onClick={onClose}>
+              Kapat
+            </Button>
+          </Box>
+        )}
       </DialogContent>
     </Dialog>
   );

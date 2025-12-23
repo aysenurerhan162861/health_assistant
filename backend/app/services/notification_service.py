@@ -58,10 +58,44 @@ def notify(
         event_name=event,
         title=title,
         body=body,
-        metadata=metadata
+        extra_data=metadata  # modelde extra_data alanı var
     )
     db.add(history)
     db.commit()
+    db.refresh(history)
+
+    # 4️⃣ Canlı (WebSocket) gönderimi
+    # Not: sync fonksiyonda asyncio kullandığımız için event loop kontrolü yapıyoruz
+    try:
+        import asyncio
+        from app.controllers.chat_socket_controller import notify_via_ws
+
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(notify_via_ws(user_id, {
+                "type": "notification",
+                "id": history.id,
+                "title": title,
+                "body": body,
+                "event_name": event,
+                "event_metadata": metadata,
+                "read": False,
+                "created_at": history.created_at.isoformat() if history.created_at else None,
+            }))
+        else:
+            loop.run_until_complete(notify_via_ws(user_id, {
+                "type": "notification",
+                "id": history.id,
+                "title": title,
+                "body": body,
+                "event_name": event,
+                "event_metadata": metadata,
+                "read": False,
+                "created_at": history.created_at.isoformat() if history.created_at else None,
+            }))
+    except Exception as exc:
+        # WS gönderimi başarısız olsa bile akışı bozma
+        print(f"[notify] WS gönderilemedi: {exc}")
 
 
 async def notify_event(
@@ -90,11 +124,12 @@ async def notify_event(
     # 🌟 Async WebSocket çağrısı
     await notify_via_ws(user_id, {
         "type": "notification",
-        "event": event_name,
+        "id": notif.id,
+        "event_name": event_name,
         "title": title,
         "body": body,
-        "extra_data": extra_data,
-        "id": notif.id,
+        "event_metadata": extra_data,
+        "read": False,
         "created_at": notif.created_at.isoformat()
     })
     return notif
