@@ -12,8 +12,6 @@ from app.database import get_db
 from app.utils.email_service import send_email
 from app.models.doctor_team import DoctorTeam
 
-
-
 def register_user(db: Session, user_data: UserCreate):
     existing = db.query(User).filter(User.email == user_data.email).first()
     if existing:
@@ -183,3 +181,38 @@ def create_staff_user(db: Session, name: str, email: str, role: str, parent_id: 
 
 def get_user_by_email(db: Session, email: str):
     return db.query(User).filter(User.email == email).first()
+
+def reset_staff_password_and_send_mail(
+    db: Session,
+    staff_id: int,
+    doctor_id: int
+):
+    user = db.query(User).filter(User.id == staff_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+
+    team_entry = db.query(DoctorTeam).filter(
+        DoctorTeam.doctor_id == doctor_id,
+        DoctorTeam.member_id == staff_id
+    ).first()
+
+    if not team_entry:
+        raise HTTPException(status_code=403, detail="Yetkisiz işlem.")
+
+    new_password = secrets.token_urlsafe(8)
+    user.password = hash_password(new_password)
+    user.must_change_password = True
+
+    db.commit()
+
+    send_email(
+        to_email=user.email,
+        subject="Şifreniz Yenilendi",
+        body=(
+            f"Merhaba {user.name},\n\n"
+            f"Yeni geçici şifreniz: {new_password}\n\n"
+            f"Lütfen ilk girişte şifrenizi değiştiriniz."
+        )
+    )
+
+    return {"message": "Yeni şifre oluşturuldu ve mail gönderildi."}

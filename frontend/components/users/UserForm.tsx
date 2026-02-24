@@ -1,4 +1,4 @@
-// components/users/UserForm.tsx
+
 "use client";
 import React, { useState, useEffect } from "react";
 import {
@@ -10,7 +10,12 @@ import {
   Paper,
   Typography,
 } from "@mui/material";
-import { User, addTeamMember, updateTeamMember } from "../../services/api";
+import {
+  User,
+  addTeamMember,
+  updateTeamMember,
+  resendStaffMail,
+} from "../../services/api";
 
 export interface UserFormProps {
   user?: User | null;
@@ -21,7 +26,7 @@ export interface UserFormProps {
     name: string;
     email: string;
     role: "assistant" | "sekreter";
-  } | undefined;
+  };
 }
 
 const UserForm: React.FC<UserFormProps> = ({
@@ -32,13 +37,17 @@ const UserForm: React.FC<UserFormProps> = ({
   initialData,
 }) => {
   const [formData, setFormData] = useState({
-    name: initialData?.name || "",
-    email: initialData?.email || "",
-    role: initialData?.role || "assistant",
+    name: "",
+    email: "",
+    role: "assistant" as "assistant" | "sekreter",
   });
 
+  const [mailLoading, setMailLoading] = useState(false);
+
   useEffect(() => {
-    if (initialData) setFormData(initialData);
+    if (initialData) {
+      setFormData(initialData);
+    }
   }, [initialData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,14 +57,12 @@ const UserForm: React.FC<UserFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     try {
-      if (initialData) {
-        // Düzenleme
-        if (!user) return;
+      if (initialData && user) {
         await updateTeamMember(user.id, formData);
-        onMessage?.("Kullanıcı başarıyla güncellendi ✅");
+        onMessage?.("Kullanıcı güncellendi ✅");
       } else {
-        // Yeni kullanıcı ekleme
         await addTeamMember(formData);
         onMessage?.("Yeni kullanıcı eklendi ✅");
       }
@@ -66,11 +73,30 @@ const UserForm: React.FC<UserFormProps> = ({
     }
   };
 
+  const handleResendMail = async () => {
+    console.log("MAIL TIKLANDI - USER:", user);
+    if (!user || !user.id) {
+    onMessage?.("User bilgisi yok ❌");
+    return;
+  }
+
+    try {
+      setMailLoading(true);
+      await resendStaffMail(user.id);
+      onMessage?.("Giriş maili tekrar gönderildi 📧");
+    } catch (err: any) {
+      onMessage?.(err.message || "Mail gönderilemedi ❌");
+    } finally {
+      setMailLoading(false);
+    }
+  };
+
   return (
     <Paper sx={{ p: 3, borderRadius: 2, mb: 3 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
         {initialData ? "Kullanıcı Düzenle" : "Yeni Kullanıcı Ekle"}
       </Typography>
+
       <Box component="form" onSubmit={handleSubmit}>
         <Stack spacing={2}>
           <TextField
@@ -80,6 +106,7 @@ const UserForm: React.FC<UserFormProps> = ({
             onChange={handleChange}
             required
           />
+
           <TextField
             label="E-posta"
             name="email"
@@ -87,6 +114,7 @@ const UserForm: React.FC<UserFormProps> = ({
             onChange={handleChange}
             required
           />
+
           <TextField
             label="Rol"
             name="role"
@@ -97,11 +125,32 @@ const UserForm: React.FC<UserFormProps> = ({
             <MenuItem value="assistant">Asistan</MenuItem>
             <MenuItem value="sekreter">Sekreter</MenuItem>
           </TextField>
+
           <Stack direction="row" spacing={2}>
+            {/* ✅ SUBMIT */}
             <Button type="submit" variant="contained">
               {initialData ? "Güncelle" : "Ekle"}
             </Button>
-            <Button variant="outlined" onClick={onClose}>
+
+            {/* ✅ SUBMIT DEĞİL */}
+            {initialData && user && (
+              <Button
+                type="button"
+                variant="outlined"
+                onClick={handleResendMail}
+                disabled={mailLoading}
+              >
+                {mailLoading ? "Gönderiliyor..." : "Mail Gönder"}
+              </Button>
+            )}
+
+            {/* ✅ İPTAL MUTLAKA BUTTON */}
+            <Button
+              type="button"
+              variant="outlined"
+              color="inherit"
+              onClick={onClose}
+            >
               İptal
             </Button>
           </Stack>

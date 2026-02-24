@@ -1,4 +1,3 @@
-// src/components/assistant/AssistantPatients.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
@@ -8,9 +7,18 @@ import {
   TextField,
   MenuItem,
   Stack,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import axios from "axios";
+
+import PatientCardModal from "../patients/PatientCardContent";
+import ChatWindow from "../message/ChatWindow";
 
 interface Patient {
   id: number;
@@ -24,12 +32,15 @@ interface Patient {
 const AssistantPatients: React.FC = () => {
   const [rows, setRows] = useState<Patient[]>([]);
   const [filter, setFilter] = useState("");
-  const [filterType, setFilterType] = useState("all"); // 🔹 yeni eklendi
+  const [filterType, setFilterType] = useState("all");
   const [loading, setLoading] = useState(false);
+
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [detailTab, setDetailTab] = useState(0);
 
   const primaryColor = "#0a2d57";
 
-  // Giriş yapan kullanıcı (asistan)
+  // 🔹 giriş yapan asistan
   const assistantId =
     typeof window !== "undefined"
       ? JSON.parse(localStorage.getItem("user") || "{}")?.id
@@ -55,27 +66,27 @@ const AssistantPatients: React.FC = () => {
     fetchPatients();
   }, [assistantId]);
 
-  // 🔍 Filtreleme (alan seçimine göre)
+  // 🔍 Filtreleme
   const filteredPatients = useMemo(() => {
     if (!filter) return rows;
-    const lowerFilter = filter.toLowerCase();
+    const lower = filter.toLowerCase();
 
     return rows.filter((p) => {
       switch (filterType) {
         case "name":
-          return p.name?.toLowerCase().includes(lowerFilter);
+          return p.name?.toLowerCase().includes(lower);
         case "email":
-          return p.email?.toLowerCase().includes(lowerFilter);
+          return p.email?.toLowerCase().includes(lower);
         case "phone":
-          return p.phone?.toLowerCase().includes(lowerFilter);
+          return p.phone?.toLowerCase().includes(lower);
         case "status":
-          return p.status?.toLowerCase().includes(lowerFilter);
-        default: // "all"
+          return p.status?.toLowerCase().includes(lower);
+        default:
           return (
-            p.name?.toLowerCase().includes(lowerFilter) ||
-            p.email?.toLowerCase().includes(lowerFilter) ||
-            p.phone?.toLowerCase().includes(lowerFilter) ||
-            p.status?.toLowerCase().includes(lowerFilter)
+            p.name?.toLowerCase().includes(lower) ||
+            p.email?.toLowerCase().includes(lower) ||
+            p.phone?.toLowerCase().includes(lower) ||
+            p.status?.toLowerCase().includes(lower)
           );
       }
     });
@@ -92,6 +103,23 @@ const AssistantPatients: React.FC = () => {
     { field: "email", headerName: "E-posta", flex: 1 },
     { field: "phone", headerName: "Telefon", flex: 1 },
     { field: "status", headerName: "Durum", flex: 1 },
+    {
+      field: "detail",
+      headerName: "Detay",
+      flex: 1,
+      renderCell: (params) => (
+        <Button
+          variant="contained"
+          size="small"
+          onClick={() => {
+            setSelectedPatient(params.row);
+            setDetailTab(0);
+          }}
+        >
+          Detay
+        </Button>
+      ),
+    },
   ];
 
   return (
@@ -103,7 +131,7 @@ const AssistantPatients: React.FC = () => {
         İzin Verilmiş Hastalar
       </Typography>
 
-      {/* 🔽 Filtreleme alanı */}
+      {/* 🔍 Filtre */}
       <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
         <TextField
           select
@@ -111,7 +139,7 @@ const AssistantPatients: React.FC = () => {
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
           size="small"
-          sx={{ width: "200px" }}
+          sx={{ width: 200 }}
         >
           <MenuItem value="all">Tümü</MenuItem>
           <MenuItem value="name">İsim</MenuItem>
@@ -138,12 +166,55 @@ const AssistantPatients: React.FC = () => {
           pageSizeOptions={[5, 10]}
           loading={loading}
           disableRowSelectionOnClick
-          sx={{
-            "& .MuiDataGrid-columnHeader": { backgroundColor: "#e3f2fd" },
-            "& .MuiDataGrid-cell": { outline: "none !important" },
-          }}
         />
       </Paper>
+
+      {/* 🔥 DETAY MODAL */}
+      <Dialog
+        open={!!selectedPatient}
+        onClose={() => setSelectedPatient(null)}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle
+          sx={{ display: "flex", justifyContent: "space-between" }}
+        >
+          Hasta Detayı
+          <Button onClick={() => setSelectedPatient(null)}>X</Button>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ p: 0 }}>
+          <Tabs
+            value={detailTab}
+            onChange={(e, v) => setDetailTab(v)}
+            sx={{ borderBottom: 1, borderColor: "divider" }}
+          >
+            <Tab label="Kişisel Bilgiler" />
+            <Tab label="Mesajlar" />
+          </Tabs>
+
+          <Box sx={{ p: 2 }}>
+            {detailTab === 0 && selectedPatient && (
+              <PatientCardModal patient={selectedPatient} />
+            )}
+
+            {detailTab === 1 &&
+              selectedPatient &&
+              assistantId &&
+              typeof window !== "undefined" && (
+                <ChatWindow
+                  room={`chat_${Math.min(
+                    assistantId,
+                    selectedPatient.id
+                  )}_${Math.max(assistantId, selectedPatient.id)}`}
+                  senderId={assistantId}
+                  receiverId={selectedPatient.id}
+                  role="assistant"
+                />
+              )}
+          </Box>
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, status
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, UserLogin, UserUpdate, UserOut, StaffCreate
-from app.services.user_service import register_user, login_user, get_current_user, hash_password
+from app.services.user_service import register_user, login_user, get_current_user, hash_password, reset_staff_password_and_send_mail
 from app.database import get_db
 from app.models.user import User
 from app.services.user_service import create_staff_user
@@ -118,3 +118,21 @@ def update_own_profile(
     db.commit()
     db.refresh(staff)
     return staff
+
+@router.post("/team/resend-mail/{staff_id}")
+def resend_staff_mail(
+    staff_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "doctor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sadece doktor bu işlemi yapabilir."
+        )
+
+    return reset_staff_password_and_send_mail(
+        db=db,
+        staff_id=staff_id,
+        doctor_id=current_user.id
+    )

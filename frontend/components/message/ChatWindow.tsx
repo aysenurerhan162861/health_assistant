@@ -16,7 +16,7 @@ interface ChatWindowProps {
   room: string;
   senderId: number;
   receiverId: number;
-  role: "doctor" | "patient";
+  role: "doctor" | "patient"| "assistant";
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ room, senderId, receiverId, role }) => {

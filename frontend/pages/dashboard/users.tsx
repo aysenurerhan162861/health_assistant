@@ -41,18 +41,16 @@ const UserManagementPage: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [loadingMail, setLoadingMail] = useState(false);
   const [filterText, setFilterText] = useState("");
-  const [selectedFilters, setSelectedFilters] = useState<string[]>(["name", "email", "role"]);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>(["name"]);
 
   const primaryColor = "#0a2d57";
   const filterOptions = ["name", "email", "role"];
 
-  // fetch staff
   const fetchStaff = async () => {
     try {
       const staff = await getMyStaff();
       setStaffMembers(staff);
-    } catch (err) {
-      console.error(err);
+    } catch {
       setMessage("Alt kullanıcılar alınamadı ❌");
       setSnackbarOpen(true);
     }
@@ -68,95 +66,63 @@ const UserManagementPage: React.FC = () => {
   };
 
   const handleAddClick = () => {
-    if (activeForm === "add") {
-      setActiveForm(null);
-      setSelectedStaff(null);
-      setTeamData({ name: "", email: "", role: "assistant" });
-    } else {
-      setActiveForm("add");
-      setSelectedStaff(null);
-      setTeamData({ name: "", email: "", role: "assistant" });
-    }
+    setActiveForm(activeForm === "add" ? null : "add");
+    setSelectedStaff(null);
+    setTeamData({ name: "", email: "", role: "assistant" });
   };
 
   const handleTeamSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await addTeamMember(teamData);
-      setMessage("Alt kullanıcı eklendi! ✅");
-      setSnackbarOpen(true);
-      setTeamData({ name: "", email: "", role: "assistant" });
-      await fetchStaff();
-      setActiveForm(null);
-    } catch {
-      setMessage("Alt kullanıcı eklenemedi ❌");
-      setSnackbarOpen(true);
-    }
+    await addTeamMember(teamData);
+    await fetchStaff();
+    setActiveForm(null);
+    setMessage("Alt kullanıcı eklendi ✅");
+    setSnackbarOpen(true);
   };
 
-  // ✅ Güncellenen kısım
   const handleEditClick = (staff: User) => {
-    // Aynı kullanıcıya tekrar basılırsa form kapanır
-    if (selectedStaff && selectedStaff.id === staff.id && activeForm === "edit") {
-      setActiveForm(null);
-      setSelectedStaff(null);
-      setTeamData({ name: "", email: "", role: "assistant" });
-    } else {
-      setSelectedStaff(staff);
-      setTeamData({
-        name: staff.name || "",
-        email: staff.email || "",
-        role: (staff.role as "assistant" | "sekreter") || "assistant",
-      });
-      setActiveForm("edit");
-    }
+    setSelectedStaff(staff);
+    setTeamData({
+      name: staff.name || "",
+      email: staff.email || "",
+      role: (staff.role as "assistant" | "sekreter") || "assistant",
+    });
+    setActiveForm("edit");
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStaff) return;
-    try {
-      const res: any = await updateTeamMember(selectedStaff.id, teamData);
-      if (res?.error) {
-        setMessage(res.error);
-        setSnackbarOpen(true);
-        return;
-      }
-      await fetchStaff();
-      setMessage("Alt kullanıcı güncellendi ✅");
-      setSnackbarOpen(true);
-      setActiveForm(null);
-      setSelectedStaff(null);
-      setTeamData({ name: "", email: "", role: "assistant" });
-    } catch {
-      setMessage("Güncelleme başarısız ❌");
-      setSnackbarOpen(true);
-    }
+
+    await updateTeamMember(selectedStaff.id, teamData);
+    await fetchStaff();
+
+    setActiveForm(null);
+    setSelectedStaff(null);
+    setMessage("Alt kullanıcı güncellendi ✅");
+    setSnackbarOpen(true);
   };
 
   const handleRemoveStaff = async (id: number) => {
-    try {
-      await removeTeamMember(id);
-      setMessage("Alt kullanıcı silindi ✅");
-      setSnackbarOpen(true);
-      setStaffMembers((prev) => prev.filter((s) => s.id !== id));
-    } catch {
-      setMessage("Silme işlemi başarısız ❌");
-      setSnackbarOpen(true);
-    }
+    await removeTeamMember(id);
+    setStaffMembers((prev) => prev.filter((s) => s.id !== id));
+    setMessage("Alt kullanıcı silindi ✅");
+    setSnackbarOpen(true);
   };
 
   const handleResendMail = async () => {
     if (!selectedStaff) return;
+
+    console.log("MAIL GÖNDER TIKLANDI"); // 🧪 test
+
     setLoadingMail(true);
     try {
       const res = await resendStaffMail(selectedStaff.id);
-      setMessage(res.message);
-      setSnackbarOpen(true);
+      setMessage(res.message || "Mail gönderildi ✅");
     } catch (err: any) {
       setMessage(err.message || "Mail gönderilemedi ❌");
-      setSnackbarOpen(true);
     } finally {
+      setSnackbarOpen(true);
       setLoadingMail(false);
     }
   };
@@ -172,43 +138,29 @@ const UserManagementPage: React.FC = () => {
       sortable: false,
       renderCell: (params: GridRenderCellParams) => (
         <Stack direction="row" spacing={1}>
-          <Tooltip title="Düzenle">
-            <IconButton
-              size="small"
-              color="primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEditClick(params.row);
-              }}
-            >
-              <EditIcon />
-            </IconButton>
-          </Tooltip>
-
-          <Tooltip title="Sil">
-            <IconButton
-              size="small"
-              color="error"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm("Bu kullanıcıyı silmek istediğinize emin misiniz?")) {
-                  handleRemoveStaff(params.row.id);
-                }
-              }}
-            >
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
+          <IconButton onClick={() => handleEditClick(params.row)}>
+            <EditIcon />
+          </IconButton>
+          <IconButton
+            color="error"
+            onClick={() => {
+              if (confirm("Silmek istiyor musunuz?")) {
+                handleRemoveStaff(params.row.id);
+              }
+            }}
+          >
+            <DeleteIcon />
+          </IconButton>
         </Stack>
       ),
     },
   ];
 
   const filteredStaff = useMemo(() => {
-    if (!filterText || selectedFilters.length === 0) return staffMembers;
+    if (!filterText) return staffMembers;
     return staffMembers.filter((s) =>
-      selectedFilters.some((field) =>
-        (s[field as keyof User] || "")
+      selectedFilters.some((f) =>
+        (s[f as keyof User] || "")
           .toString()
           .toLowerCase()
           .includes(filterText.toLowerCase())
@@ -218,40 +170,37 @@ const UserManagementPage: React.FC = () => {
 
   return (
     <Layout>
-      <Box sx={{ pt: "80px", px: 4, minHeight: "100vh" }}>
-        <Typography variant="h4" gutterBottom sx={{ color: primaryColor, fontWeight: "bold" }}>
+      <Box sx={{ pt: "80px", px: 4 }}>
+        <Typography variant="h4" gutterBottom>
           Kullanıcı Yönetimi
         </Typography>
 
-        <Button variant="contained" startIcon={<AddCircleOutlineIcon />} sx={{ mb: 3 }} onClick={handleAddClick}>
+        <Button variant="contained" onClick={handleAddClick}>
           Yeni Kullanıcı Ekle
         </Button>
 
-        {/* Form */}
         {activeForm && (
-          <Paper sx={{ p: 3, mb: 3, boxShadow: 3 }}>
+          <Paper sx={{ p: 3, my: 3 }}>
             <form onSubmit={activeForm === "edit" ? handleEditSubmit : handleTeamSubmit}>
               <Stack spacing={2}>
-                <TextField label="Ad Soyad" name="name" value={teamData.name} onChange={handleTeamChange} required />
-                <TextField label="E-posta" name="email" value={teamData.email} onChange={handleTeamChange} required />
-                <TextField label="Rol" name="role" select value={teamData.role} onChange={handleTeamChange}>
+                <TextField name="name" label="Ad Soyad" value={teamData.name} onChange={handleTeamChange} />
+                <TextField name="email" label="E-posta" value={teamData.email} onChange={handleTeamChange} />
+                <TextField select name="role" label="Rol" value={teamData.role} onChange={handleTeamChange}>
                   <MenuItem value="assistant">Asistan</MenuItem>
                   <MenuItem value="sekreter">Sekreter</MenuItem>
                 </TextField>
+
                 <Stack direction="row" spacing={2}>
-                  <Button type="submit" variant="contained" color="primary">
-                    {activeForm === "edit" ? "Güncelle" : "Ekle"}
+                  <Button type="submit" variant="contained">
+                    Güncelle
                   </Button>
+
                   {activeForm === "edit" && (
                     <Button
+                      type="button" // 🔥 KRİTİK SATIR
                       variant="outlined"
                       onClick={handleResendMail}
                       disabled={loadingMail}
-                      sx={{
-                        color: primaryColor,
-                        borderColor: primaryColor,
-                        "&:hover": { backgroundColor: primaryColor, color: "#fff", borderColor: primaryColor },
-                      }}
                     >
                       {loadingMail ? "Gönderiliyor..." : "Mail Gönder"}
                     </Button>
@@ -262,65 +211,16 @@ const UserManagementPage: React.FC = () => {
           </Paper>
         )}
 
-        {/* Filtreleme */}
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} mb={2}>
-          <TextField
-            select
-            label="Filtre Alanı"
-            size="small"
-            variant="outlined"
-            value={selectedFilters[0]}
-            onChange={(e) => setSelectedFilters([e.target.value])}
-            sx={{ minWidth: 140 }}
-          >
-            {filterOptions.map((option) => (
-              <MenuItem key={option} value={option}>
-                {option.charAt(0).toUpperCase() + option.slice(1)}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            label="Ara..."
-            variant="outlined"
-            size="small"
-            value={filterText}
-            onChange={(e) => setFilterText(e.target.value)}
-            fullWidth
-          />
-        </Stack>
+        <DataGrid
+          rows={filteredStaff}
+          columns={columns}
+          getRowId={(row) => row.id}
+          autoHeight
+          disableRowSelectionOnClick
+        />
 
-        {/* DataGrid */}
-        <Box sx={{ width: "100%" }}>
-          <DataGrid
-            rows={filteredStaff}
-            columns={columns}
-            getRowId={(row) => row.id}
-            autoHeight
-            pageSizeOptions={[5, 10, 20]}
-            disableRowSelectionOnClick
-            onRowClick={(params, event) => {
-              const target = event.target as HTMLElement;
-              // ✅ Butona veya ikona basılırsa kişi kartı açılmasın
-              if (target.closest("button") || target.closest("svg")) return;
-              setSelectedStaff(params.row);
-            }}
-            sx={{
-              bgcolor: "#fff",
-              borderRadius: 2,
-              boxShadow: 2,
-              "& .MuiDataGrid-cell:hover": { backgroundColor: "rgba(0,0,0,0.04)" },
-            }}
-          />
-        </Box>
-
-        {/* Staff Modal */}
-        {selectedStaff && <StaffCardModal staff={selectedStaff} onClose={() => setSelectedStaff(null)} />}
-
-        {/* Snackbar */}
         <Snackbar open={snackbarOpen} autoHideDuration={4000} onClose={() => setSnackbarOpen(false)}>
-          <Alert severity="info" sx={{ width: "100%" }}>
-            {message}
-          </Alert>
+          <Alert severity="info">{message}</Alert>
         </Snackbar>
       </Box>
     </Layout>
