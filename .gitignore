@@ -1,18 +1,35 @@
+# ========================
 # Python
+# ========================
 __pycache__/
 *.pyc
 env/
 venv/
 *.sqlite3
-.env
+.env                # API key ve gizli bilgiler
 
-# Node
+# ========================
+# Node / JavaScript
+# ========================
 node_modules/
-.next/
+.next/               # Next.js build klasörü
+dist/                # Üretim build klasörü varsa
+out/                 # Next.js export klasörü
 
-# Docker
+# ========================
+# Docker / Logs
+# ========================
 *.log
 docker-compose.override.yml
 
-# VSCode
+# ========================
+# IDE / Editor
+# ========================
 .vscode/
+.idea/
+
+# ========================
+# Firebase / Service Worker
+# ========================
+public/firebase-messaging-sw.js
+.firebase-messaging-sw.js   # root'ta varsa
