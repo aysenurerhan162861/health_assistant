@@ -33,3 +33,8 @@ docker-compose.override.yml
 # ========================
 public/firebase-messaging-sw.js
 .firebase-messaging-sw.js   # root'ta varsa
+
+backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local

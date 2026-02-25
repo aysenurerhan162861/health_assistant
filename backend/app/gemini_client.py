@@ -14,7 +14,6 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 
 client = genai.Client(api_key=API_KEY)
 
-print("Kullanılan Gemini API key:", API_KEY)
 
 # Rate limiter: Gemini Free Tier ~15 req/min, Pro daha yüksek
 class SimpleRateLimiter:
