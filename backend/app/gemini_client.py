@@ -56,7 +56,7 @@ def get_health_comment(test_results):
     """
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",   # ✔ Doğru model
+        model="gemini-2.5-flash",   # ✔ Doğru model
         contents=prompt                  # ✔ Dashboard ile aynı parametre
     )
 
@@ -142,7 +142,7 @@ Lütfen yanıtını şu JSON formatında ver:
             _rate_limiter.record_request()
             
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=contents
             )
 
@@ -292,7 +292,7 @@ Lütfen sonucu sadece aşağıdaki JSON formatında döndür:
             _rate_limiter.record_request()
             
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=prompt
             )
 
@@ -437,7 +437,7 @@ Lütfen kullanıcının mesajına uygun, sakin ve destekleyici bir cevap ver."""
             _rate_limiter.record_request()
             
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=full_prompt
             )
             
