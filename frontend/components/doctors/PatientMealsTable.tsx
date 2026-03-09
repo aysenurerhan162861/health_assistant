@@ -4,12 +4,7 @@ import React, { useState } from "react";
 import {
   Box,
   Button,
-  Table,
-  TableBody,
-  TableCell,
   TableContainer,
-  TableHead,
-  TableRow,
   Paper,
   Typography,
   TextField,
@@ -28,12 +23,14 @@ interface PatientMealsTableProps {
   meals: Meal[];
   patientId: number;
   refreshMeals: () => void;
+  userRole?: "doctor" | "assistant";
 }
 
 const PatientMealsTable: React.FC<PatientMealsTableProps> = ({
   meals,
   patientId,
   refreshMeals,
+  userRole = "doctor",
 }) => {
   const [openRowId, setOpenRowId] = useState<number | null>(null);
   const [accordionComment, setAccordionComment] = useState<string>("");
@@ -57,13 +54,11 @@ const PatientMealsTable: React.FC<PatientMealsTableProps> = ({
       setAccordionComment("");
       return;
     }
-
     if (openRowId === meal.id) {
       setOpenRowId(null);
       setAccordionComment("");
       return;
     }
-
     setOpenRowId(meal.id ?? null);
     setAccordionComment(meal.doctor_comment || "");
   };
@@ -97,7 +92,7 @@ const PatientMealsTable: React.FC<PatientMealsTableProps> = ({
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ backgroundColor: "#f0f0f0" }}>
-              <th style={{ padding: "8px" }}></th>
+              {userRole !== "assistant" && <th style={{ padding: "8px" }}></th>}
               <th style={{ padding: "8px" }}>Tarih</th>
               <th style={{ padding: "8px" }}>Öğün Tipi</th>
               <th style={{ padding: "8px" }}>AI Kalori</th>
@@ -108,117 +103,119 @@ const PatientMealsTable: React.FC<PatientMealsTableProps> = ({
           </thead>
 
           <tbody>
-            {meals.map((meal) => (
-              <React.Fragment key={meal.id}>
-                <tr style={{ backgroundColor: "white" }}>
-                  <td style={{ padding: "8px", verticalAlign: "top", width: 48 }}>
-                    <IconButton size="small" onClick={() => toggleAccordionForMeal(meal)}>
-                      <EditIcon />
-                    </IconButton>
-                  </td>
+            {meals.length === 0 ? (
+              <tr>
+                <td colSpan={userRole === "assistant" ? 6 : 7} style={{ padding: "16px", textAlign: "center", color: "#666" }}>
+                  Henüz öğün kaydı bulunmuyor.
+                </td>
+              </tr>
+            ) : (
+              meals.map((meal) => (
+                <React.Fragment key={meal.id}>
+                  <tr style={{ backgroundColor: "white" }}>
+                    {userRole !== "assistant" && (
+                      <td style={{ padding: "8px", verticalAlign: "top", width: 48 }}>
+                        <IconButton size="small" onClick={() => toggleAccordionForMeal(meal)}>
+                          <EditIcon />
+                        </IconButton>
+                      </td>
+                    )}
 
-                  <td style={{ padding: "8px" }}>
-                    {new Date(meal.meal_datetime).toLocaleString("tr-TR", {
-                      year: "numeric",
-                      month: "2-digit",
-                      day: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </td>
+                    <td style={{ padding: "8px" }}>
+                      {new Date(meal.meal_datetime).toLocaleString("tr-TR", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
 
-                  <td style={{ padding: "8px" }}>{getMealTypeLabel(meal.meal_type)}</td>
+                    <td style={{ padding: "8px" }}>{getMealTypeLabel(meal.meal_type)}</td>
 
-                  <td style={{ padding: "8px" }}>
-                    {meal.gemini_calorie != null ? `${meal.gemini_calorie} kcal` : "-"}
-                  </td>
+                    <td style={{ padding: "8px" }}>
+                      {meal.gemini_calorie != null ? `${meal.gemini_calorie} kcal` : "-"}
+                    </td>
 
-                  <td style={{ padding: "8px" }}>
-                    <Typography variant="body2" sx={{ whiteSpace: "pre-line", maxWidth: 400 }}>
-                      {meal.gemini_comment || "-"}
-                    </Typography>
-                  </td>
+                    <td style={{ padding: "8px" }}>
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-line", maxWidth: 400 }}>
+                        {meal.gemini_comment || "-"}
+                      </Typography>
+                    </td>
 
-                  <td style={{ padding: "8px" }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {meal.gemini_comment ? "Mevcut" : "-"}
-                    </Typography>
-                  </td>
+                    <td style={{ padding: "8px" }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {meal.gemini_comment ? "Mevcut" : "-"}
+                      </Typography>
+                    </td>
 
-                  <td style={{ padding: "8px" }}>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={() => handleShowMeal(meal)}
-                      sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#082147" } }}
-                    >
-                      Göster
-                    </Button>
-                  </td>
-                </tr>
-
-                {/* Accordion satırı */}
-                {openRowId === meal.id && (
-                  <tr>
-                    <td colSpan={7}>
-                      <Box
-                        sx={{
-                          mt: 1,
-                          p: 2,
-                          borderRadius: 2,
-                          boxShadow: 1,
-                          backgroundColor: "#f7f9fc",
-                          border: "1px solid #e0e7ef",
-                        }}
+                    <td style={{ padding: "8px" }}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handleShowMeal(meal)}
+                        sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#082147" } }}
                       >
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            mb: 1,
-                          }}
-                        >
-                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                            Doktor Yorumu Düzenle
-                          </Typography>
-
-                          <IconButton size="small" onClick={() => toggleAccordionForMeal(null)}>
-                            <CloseIcon />
-                          </IconButton>
-                        </Box>
-
-                        <TextField
-                          label="Doktor Yorumu"
-                          multiline
-                          minRows={4}
-                          fullWidth
-                          value={accordionComment}
-                          onChange={(e) => setAccordionComment(e.target.value)}
-                          variant="outlined"
-                        />
-
-                        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
-                          <Button
-                            variant="contained"
-                            onClick={() => handleSaveAccordion(meal.id!)}
-                            disabled={savingAccordionId === meal.id}
-                            sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#082147" } }}
-                          >
-                            {savingAccordionId === meal.id ? "Kaydediliyor..." : "Kaydet"}
-                          </Button>
-                        </Box>
-                      </Box>
+                        Göster
+                      </Button>
                     </td>
                   </tr>
-                )}
-              </React.Fragment>
-            ))}
+
+                  {/* Accordion - sadece doktor */}
+                  {userRole !== "assistant" && openRowId === meal.id && (
+                    <tr>
+                      <td colSpan={7}>
+                        <Box
+                          sx={{
+                            mt: 1,
+                            p: 2,
+                            borderRadius: 2,
+                            boxShadow: 1,
+                            backgroundColor: "#f7f9fc",
+                            border: "1px solid #e0e7ef",
+                          }}
+                        >
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                              Doktor Yorumu Düzenle
+                            </Typography>
+                            <IconButton size="small" onClick={() => toggleAccordionForMeal(null)}>
+                              <CloseIcon />
+                            </IconButton>
+                          </Box>
+
+                          <TextField
+                            label="Doktor Yorumu"
+                            multiline
+                            minRows={4}
+                            fullWidth
+                            value={accordionComment}
+                            onChange={(e) => setAccordionComment(e.target.value)}
+                            variant="outlined"
+                          />
+
+                          <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+                            <Button
+                              variant="contained"
+                              onClick={() => handleSaveAccordion(meal.id!)}
+                              disabled={savingAccordionId === meal.id}
+                              sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#082147" } }}
+                            >
+                              {savingAccordionId === meal.id ? "Kaydediliyor..." : "Kaydet"}
+                            </Button>
+                          </Box>
+                        </Box>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))
+            )}
           </tbody>
         </table>
       </TableContainer>
 
-      {/* Öğün İçeriği Görüntüleme Modal */}
+      {/* Öğün Görüntüleme Modal */}
       <Dialog open={!!viewingMeal} onClose={handleCloseViewModal} maxWidth="md" fullWidth>
         <DialogTitle>
           Öğün İçeriği
@@ -237,12 +234,9 @@ const PatientMealsTable: React.FC<PatientMealsTableProps> = ({
         <DialogContent>
           {viewingMeal && (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 2 }}>
-              {/* Fotoğraf */}
               {viewingMeal.image_path && (
                 <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "bold" }}>
-                    Fotoğraf:
-                  </Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "bold" }}>Fotoğraf:</Typography>
                   <Box
                     component="img"
                     src={`http://localhost:8000/${viewingMeal.image_path}`}
@@ -258,12 +252,9 @@ const PatientMealsTable: React.FC<PatientMealsTableProps> = ({
                 </Box>
               )}
 
-              {/* Metin Açıklama */}
               {viewingMeal.text_description && (
                 <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "bold" }}>
-                    Metin Açıklama:
-                  </Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "bold" }}>Metin Açıklama:</Typography>
                   <Typography
                     variant="body1"
                     sx={{
@@ -279,7 +270,6 @@ const PatientMealsTable: React.FC<PatientMealsTableProps> = ({
                 </Box>
               )}
 
-              {/* İkisi de yoksa */}
               {!viewingMeal.image_path && !viewingMeal.text_description && (
                 <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
                   Bu öğün için içerik bulunmuyor.
@@ -297,4 +287,3 @@ const PatientMealsTable: React.FC<PatientMealsTableProps> = ({
 };
 
 export default PatientMealsTable;
-

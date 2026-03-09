@@ -1,29 +1,14 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Tabs,
-  Tab,
-  Box,
-  IconButton,
-  Typography,
-  Switch,
-  FormControlLabel,
-  CircularProgress,
+  Dialog, DialogTitle, DialogContent, Tabs, Tab, Box,
+  IconButton, Typography, Switch, FormControlLabel, CircularProgress,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { Meal } from "@/types/Meal";
 import { User } from "@/types/user";
-import PatientCardContent from "../patients/PatientCardContent";
-import {
-  getPatientMealsForDoctor,
-  getMealNotificationSetting,
-  updateMealNotificationSetting,
-} from "@/services/MealApi";
+import { getPatientMealsForDoctor, getMealNotificationSetting, updateMealNotificationSetting } from "@/services/MealApi";
 import PatientMealsTable from "./PatientMealsTable";
 
 interface MealCommentModalProps {
@@ -31,13 +16,12 @@ interface MealCommentModalProps {
   onClose: () => void;
   meal: (Meal & { patient: User }) | null;
   onUpdate?: (updatedMeal: Meal) => void;
+  userRole?: "doctor" | "assistant";
+  allMeals?: (Meal & { patient: User })[];
 }
 
 const MealCommentModal: React.FC<MealCommentModalProps> = ({
-  open,
-  onClose,
-  meal,
-  onUpdate,
+  open, onClose, meal, onUpdate, userRole = "doctor", allMeals = [],
 }) => {
   const [tabIndex, setTabIndex] = useState(0);
   const [patientMeals, setPatientMeals] = useState<Meal[]>([]);
@@ -47,173 +31,96 @@ const MealCommentModal: React.FC<MealCommentModalProps> = ({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!meal?.patient?.id) {
-        setPatientMeals([]);
-        return;
-      }
-
+      if (!meal?.patient?.id) return;
       try {
         setLoading(true);
-        // Öğünleri ve bildirim ayarını paralel çek
-        const [meals, notificationSetting] = await Promise.all([
-          getPatientMealsForDoctor(meal.patient.id),
-          getMealNotificationSetting(meal.patient.id).catch(() => ({ meal_notification_enabled: true })),
-        ]);
-        setPatientMeals(meals);
-        setMealNotificationEnabled(notificationSetting.meal_notification_enabled);
+        if (userRole === "assistant") {
+          const filtered = allMeals.filter((m: any) =>
+            m.patient_id === meal.patient.id || m.patient?.id === meal.patient.id
+          );
+          setPatientMeals(filtered.length > 0 ? filtered : [meal]);
+          setMealNotificationEnabled(false);
+        } else {
+          const [meals, notificationSetting] = await Promise.all([
+            getPatientMealsForDoctor(meal.patient.id),
+            getMealNotificationSetting(meal.patient.id).catch(() => ({ meal_notification_enabled: true })),
+          ]);
+          setPatientMeals(meals);
+          setMealNotificationEnabled(notificationSetting.meal_notification_enabled);
+        }
       } catch (err) {
-        console.error("Veriler alınamadı:", err);
+        console.error("Veriler alinamadi:", err);
         setPatientMeals([]);
       } finally {
         setLoading(false);
       }
     };
-
-    if (open && meal) {
-      fetchData();
-    }
-  }, [meal, open]);
+    if (open && meal) fetchData();
+  }, [meal, open, userRole]);
 
   if (!meal) return null;
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabIndex(newValue);
-  };
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => setTabIndex(newValue);
 
   const handleRefreshMeals = async () => {
-    if (!meal?.patient?.id) return;
+    if (!meal?.patient?.id || userRole === "assistant") return;
     try {
       const meals = await getPatientMealsForDoctor(meal.patient.id);
       setPatientMeals(meals);
-    } catch (err) {
-      console.error("Öğünler yenilenemedi:", err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleNotificationToggle = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!meal?.patient?.id) return;
-    
     const newValue = event.target.checked;
     setMealNotificationEnabled(newValue);
     setSavingNotification(true);
-
     try {
       await updateMealNotificationSetting(meal.patient.id, newValue);
     } catch (err) {
-      console.error("Bildirim ayarı güncellenemedi:", err);
-      // Hata durumunda eski değere geri dön
       setMealNotificationEnabled(!newValue);
-      alert("Bildirim ayarı güncellenemedi!");
-    } finally {
-      setSavingNotification(false);
-    }
+      alert("Bildirim ayari guncellenemedi!");
+    } finally { setSavingNotification(false); }
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
+      <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         Detaylar
-        <IconButton onClick={onClose}>
-          <CloseIcon />
-        </IconButton>
+        <IconButton onClick={onClose}><CloseIcon /></IconButton>
       </DialogTitle>
-
-      <DialogContent
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          height: "70vh",
-          p: 0,
-        }}
-      >
-        {/* Tabs */}
+      <DialogContent sx={{ display: "flex", flexDirection: "column", height: "70vh", p: 0 }}>
         <Box sx={{ px: 3 }}>
           <Tabs value={tabIndex} onChange={handleTabChange}>
-            <Tab label="Kişisel Bilgiler" />
-            <Tab label="Hastanın Öğünleri" />
+            <Tab label="Kisisel Bilgiler" />
+            <Tab label="Hastanin Ogunleri" />
           </Tabs>
         </Box>
-
-        {/* İçerik */}
         <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>
-          {/* TAB 0 - Kişisel Bilgiler */}
           {tabIndex === 0 && (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1 }}>
-                  Hasta Adı Soyadı:
-                </Typography>
-                <Typography variant="body1">{meal.patient.name || "-"}</Typography>
-              </Box>
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1 }}>
-                  Yaş:
-                </Typography>
-                <Typography variant="body1">{meal.patient.age || "-"}</Typography>
-              </Box>
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1 }}>
-                  Cinsiyet:
-                </Typography>
-                <Typography variant="body1">{meal.patient.gender || "-"}</Typography>
-              </Box>
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1 }}>
-                  Notlar / Açıklamalar:
-                </Typography>
-                <Typography variant="body1" sx={{ whiteSpace: "pre-line" }}>
-                  {meal.patient.note || "-"}
-                </Typography>
-              </Box>
-              <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #e0e0e0" }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={mealNotificationEnabled}
-                      onChange={handleNotificationToggle}
-                      disabled={savingNotification}
-                      color="primary"
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Typography variant="body1" sx={{ fontWeight: "bold" }}>
-                        Öğün Takibi Bildirimi
-                      </Typography>
-                      {savingNotification && <CircularProgress size={16} />}
-                    </Box>
-                  }
-                />
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, ml: 4 }}>
-                  {mealNotificationEnabled
-                    ? "Hasta yeni öğün eklediğinde size bildirim gönderilecek."
-                    : "Hasta öğün eklese bile size bildirim gönderilmeyecek."}
-                </Typography>
-              </Box>
+              <Box><Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1 }}>Hasta Adi Soyadi:</Typography><Typography variant="body1">{meal.patient.name || "-"}</Typography></Box>
+              <Box><Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1 }}>Yas:</Typography><Typography variant="body1">{meal.patient.age || "-"}</Typography></Box>
+              <Box><Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1 }}>Cinsiyet:</Typography><Typography variant="body1">{meal.patient.gender || "-"}</Typography></Box>
+              <Box><Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1 }}>Notlar:</Typography><Typography variant="body1" sx={{ whiteSpace: "pre-line" }}>{meal.patient.note || "-"}</Typography></Box>
+              {userRole !== "assistant" && (
+                <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #e0e0e0" }}>
+                  <FormControlLabel
+                    control={<Switch checked={mealNotificationEnabled} onChange={handleNotificationToggle} disabled={savingNotification} color="primary" />}
+                    label={<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}><Typography variant="body1" sx={{ fontWeight: "bold" }}>Ogun Takibi Bildirimi</Typography>{savingNotification && <CircularProgress size={16} />}</Box>}
+                  />
+                </Box>
+              )}
             </Box>
           )}
-
-          {/* TAB 1 - Hastanın Öğünleri */}
           {tabIndex === 1 && (
             <Box>
               {loading ? (
-                <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-                  <Typography>Yükleniyor...</Typography>
-                </Box>
+                <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}><CircularProgress /></Box>
               ) : meal.patient.id ? (
-                <PatientMealsTable
-                  meals={patientMeals}
-                  patientId={meal.patient.id}
-                  refreshMeals={handleRefreshMeals}
-                />
+                <PatientMealsTable meals={patientMeals} patientId={meal.patient.id} refreshMeals={handleRefreshMeals} userRole={userRole} />
               ) : (
-                <Typography>Hasta bilgisi bulunamadı.</Typography>
+                <Typography>Hasta bilgisi bulunamadi.</Typography>
               )}
             </Box>
           )}
@@ -224,4 +131,3 @@ const MealCommentModal: React.FC<MealCommentModalProps> = ({
 };
 
 export default MealCommentModal;
-

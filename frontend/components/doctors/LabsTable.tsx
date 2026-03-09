@@ -10,7 +10,7 @@ import { LabReport } from "@/types/LabReport";
 interface LabsTableProps {
   labReports: LabReport[];
   onEditComment: (report: LabReport) => void;
-  userRole: "doctor" | "patient";
+  userRole: "doctor" | "patient" | "assistant";
 }
 
 interface PatientRow {

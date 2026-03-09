@@ -25,7 +25,7 @@ import { User } from "@/types/user";
 interface MealsTableProps {
   meals: Meal[];
   onViewDetail: (meal: Meal & { patient: User }) => void;
-  userRole: "doctor" | "patient";
+  userRole: "doctor" | "patient"| "assistant";
 }
 
 interface PatientRow {

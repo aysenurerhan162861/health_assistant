@@ -26,6 +26,8 @@ import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import axios from "axios";
+import BiotechIcon from "@mui/icons-material/Biotech";
+import MedicalInformationIcon from "@mui/icons-material/MedicalInformation";
 
 interface SidebarProps {
   user?: {
@@ -61,7 +63,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
     setOpenGroup((prev) => (prev === text ? null : text));
   };
 
-  // Role ataması
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -75,7 +76,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
     }
   }, [user]);
 
-  // Doktor için okunmamış tahlil sayısını çek
   useEffect(() => {
     const fetchUnreadLabs = async () => {
       try {
@@ -91,7 +91,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
         console.error(err);
       }
     };
-    fetchUnreadLabs(); // ← Burada çağırıyoruz
+    fetchUnreadLabs();
   }, [role]);
 
   const normalizedUser = {
@@ -100,7 +100,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
     photo_url: user?.photo_url || "",
   };
 
-  // Menüler (sizin mevcut yapıyı değiştirmedim)
   const baseItems: MenuItem[] = [
     { text: "Panel", icon: <DashboardIcon fontSize="small" />, href: "/dashboard" },
     { text: "Kişisel Bilgiler", icon: <PersonIcon fontSize="small" />, href: "/dashboard/personal-info" },
@@ -117,26 +116,31 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
         { text: "Onay Bekleyenler", href: "/dashboard/patients/pending" },
       ],
     },
-    { text: "Tahliller", icon: <ScienceIcon fontSize="small" />, href: "/dashboard/doctors/labs" },
-    { text: "Öğün Analizi", icon: <RestaurantIcon fontSize="small" />, href: "/dashboard/doctors/meals" },
-    { text: "Tansiyon", icon: <MonitorHeartIcon fontSize="small" />, href: "/dashboard/doctors/blood-pressure" },
+    { text: "Tahliller",     icon: <ScienceIcon fontSize="small" />,     href: "/dashboard/doctors/labs" },
+    { text: "Öğün Analizi",  icon: <RestaurantIcon fontSize="small" />,  href: "/dashboard/doctors/meals" },
+    { text: "Tansiyon",      icon: <MonitorHeartIcon fontSize="small" />, href: "/dashboard/doctors/blood-pressure" },
+    { text: "MR Analizleri", icon: <BiotechIcon fontSize="small" />,     href: "/dashboard/doctors/mr-analizi" },
   ];
 
   const patientItems: MenuItem[] = [
-    { text: "Doktorlar", icon: <PeopleIcon fontSize="small" />, href: "/dashboard/doctors" },
-    { text: "Tahlillerim", icon: <ScienceIcon fontSize="small" />, href: "/tahlil" },
-    { text: "Öğün Analizi", icon: <RestaurantIcon fontSize="small" />, href: "/ogun" },
-    { text: "Tansiyon", icon: <MonitorHeartIcon fontSize="small" />, href: "/tansiyon" },
+    { text: "Doktorlar",     icon: <PeopleIcon fontSize="small" />,      href: "/dashboard/doctors" },
+    { text: "Tahlillerim",   icon: <ScienceIcon fontSize="small" />,     href: "/tahlil" },
+    { text: "Öğün Analizi",  icon: <RestaurantIcon fontSize="small" />,  href: "/ogun" },
+    { text: "Tansiyon",      icon: <MonitorHeartIcon fontSize="small" />, href: "/tansiyon" },
+    { text: "MR Analizi",    icon: <FavoriteIcon fontSize="small" />,    href: "/mr-analizi" },
   ];
 
-  const staffItems: MenuItem[] = [
-    { text: "Hastalar", icon: <FavoriteIcon fontSize="small" />, href: "/dashboard/assistant" },
+  const assistantItems: MenuItem[] = [
+    { text: "Hastalar",      icon: <PeopleIcon fontSize="small" />,             href: "/dashboard/assistant" },
+    { text: "Öğün Analizi",  icon: <RestaurantIcon fontSize="small" />,         href: "/dashboard/assistant/meals" },
+    { text: "Tansiyon",      icon: <MonitorHeartIcon fontSize="small" />,        href: "/dashboard/assistant/blood-pressure" },
+    { text: "Tahliller",     icon: <MedicalInformationIcon fontSize="small" />,  href: "/dashboard/assistant/labs" },
+    { text: "MR Analizleri", icon: <BiotechIcon fontSize="small" />,            href: "/dashboard/assistant/mr" },
   ];
 
   const commonItems: MenuItem[] = [
-    { text: "MR Analizi", icon: <FavoriteIcon fontSize="small" />, href: "/mr-analizi" },
     { text: "Trendler", icon: <TrendingUpIcon fontSize="small" />, href: "/trendler" },
-    { text: "Ayarlar", icon: <SettingsIcon fontSize="small" />, href: "/ayarlar" },
+    { text: "Ayarlar",  icon: <SettingsIcon fontSize="small" />,   href: "/ayarlar" },
   ];
 
   let menuItems: MenuItem[] = [...baseItems];
@@ -148,8 +152,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
       menuItems = [...menuItems, ...patientItems];
       break;
     case "asistan":
-    case "sekreter":
-      menuItems = [...menuItems, ...staffItems];
+      menuItems = [...menuItems, ...assistantItems];
       break;
     default:
       menuItems = [...menuItems];
@@ -174,7 +177,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
     >
       <Toolbar />
 
-      {/* Profil */}
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", mb: 1, py: 1 }}>
         <Avatar src={normalizedUser.photo_url || ""} sx={{ width: 70, height: 70, mb: 1, border: "2px solid white" }} />
         <Typography variant="subtitle2" sx={{ fontWeight: "bold", textAlign: "center", fontSize: 14 }}>
@@ -185,7 +187,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
         </Typography>
       </Box>
 
-      {/* Menü */}
       <List sx={{ mt: 0, overflow: "hidden" }}>
         {menuItems.map((item) =>
           "type" in item && item.type === "group" ? (

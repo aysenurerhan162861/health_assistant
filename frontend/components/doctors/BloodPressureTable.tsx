@@ -25,7 +25,7 @@ import { User } from "@/types/user";
 interface BloodPressureTableProps {
   trackings: (BloodPressureTracking & { patient?: User })[];
   onViewDetail: (tracking: BloodPressureTracking & { patient?: User }) => void;
-  userRole: "doctor" | "patient";
+  userRole: "doctor" | "patient" | "assistant";
 }
 
 interface PatientRow {

@@ -57,7 +57,7 @@ const LabCommentModal: React.FC<LabCommentModalProps> = ({
     };
 
     fetchReports();
-  }, [labReport]);
+  }, [labReport?.id]);
 
   if (!labReport) return null;
 
@@ -109,7 +109,6 @@ const LabCommentModal: React.FC<LabCommentModalProps> = ({
           <Tabs value={tabIndex} onChange={handleTabChange}>
             <Tab label="Kişisel Bilgiler" />
             <Tab label="Tahliller" />
-            <Tab label="Açıklamalar" />
           </Tabs>
         </Box>
 
@@ -129,43 +128,7 @@ const LabCommentModal: React.FC<LabCommentModalProps> = ({
               userRole="doctor"
             />
           )}
-
-          {/* TAB 2 (AYNEN KALDI) */}
-          {tabIndex === 2 && (
-            <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
-              <Box sx={{ flex: 1 }}>
-                <TextField
-                  label="Doktor Açıklaması"
-                  multiline
-                  minRows={5}
-                  fullWidth
-                  value={doctorComment}
-                  onChange={(e) => setDoctorComment(e.target.value)}
-                />
-              </Box>
-
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: 1,
-                  mt: 2,
-                }}
-              >
-                <Button
-                  variant="contained"
-                  onClick={handleSaveComment}
-                  disabled={saving}
-                >
-                  {saving ? "Kaydediliyor..." : "Kaydet"}
-                </Button>
-
-                <Button variant="outlined" onClick={onClose}>
-                  Kapat
-                </Button>
-              </Box>
-            </Box>
-          )}
+          
         </Box>
 
         {/* 🔹 TAB 0 ve TAB 1 için sağ alt Kapat butonu */}

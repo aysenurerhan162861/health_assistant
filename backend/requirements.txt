@@ -16,3 +16,12 @@ pillow
 pytesseract
 pdf2image
 google-genai
+
+# ── MR Analizi için yeni eklenenler ──
+celery==5.3.6
+redis==5.0.1
+nibabel==5.2.0
+scipy==1.12.0
+torch==2.2.0
+numpy==1.26.4
+matplotlib==3.8.3

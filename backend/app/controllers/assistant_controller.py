@@ -1,15 +1,73 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
+from typing import Optional
 from app.database import get_db
 from app.services import assistant_service
 from app.schemas.doctor_patient import GrantPermissionRequest
+from app.utils.auth import verify_token
+from app.models.user import User
 
 router = APIRouter(tags=["Assistants"])
 
+
+def get_current_user_id(
+    token_header: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> int:
+    if not token_header:
+        raise HTTPException(status_code=401, detail="Token gerekli.")
+    token = token_header.replace("Bearer ", "")
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Geçersiz token.")
+    email = payload.get("sub")
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+    return user.id
+
+ #── Asistan veri endpoint'leri ───────────────────────────────────────
+
+@router.get("/me/meals")
+def get_assistant_meals(
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """Asistanın izinli hastalarının öğünleri."""
+    return assistant_service.get_assistant_meals(db, current_user_id)
+
+
+@router.get("/me/blood-pressure")
+def get_assistant_blood_pressure(
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """Asistanın izinli hastalarının tansiyon kayıtları."""
+    return assistant_service.get_assistant_blood_pressure(db, current_user_id)
+
+
+@router.get("/me/labs")
+def get_assistant_labs(
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """Asistanın can_view_labs=True olan hastalarının tahlilleri."""
+    return assistant_service.get_assistant_labs(db, current_user_id)
+
+
+@router.get("/me/mr-scans")
+def get_assistant_mr_scans(
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """Asistanın can_view_mr=True olan hastalarının MR'ları."""
+    return assistant_service.get_assistant_mr_scans(db, current_user_id)
+
+# ── Asistana hasta izni verme ────────────────────────────────────────
 @router.post("/{doctor_id}/grant_permission")
 def grant_permission_to_assistant(
     doctor_id: int,
-    request: GrantPermissionRequest,  # ✅ body ile al
+    request: GrantPermissionRequest,
     db: Session = Depends(get_db)
 ):
     permission = assistant_service.grant_permission(
@@ -17,23 +75,51 @@ def grant_permission_to_assistant(
     )
     return {"message": "Hasta asistana başarıyla atandı", "permission": permission}
 
-# 🔵 Asistanın hastalarını görmesi
+
+# ── Asistanın hastalarını görmesi ────────────────────────────────────
 @router.get("/{assistant_id}/patients")
 def get_assistant_patients(assistant_id: int, db: Session = Depends(get_db)):
     return assistant_service.get_assistant_patients(db, assistant_id)
 
-# 🔴 İzni kaldırma
+
+# ── İzni kaldırma ────────────────────────────────────────────────────
 @router.delete("/{doctor_id}/revoke_permission")
 def revoke_permission(
     doctor_id: int,
-    request: GrantPermissionRequest,  # ✅ body ile alıyoruz
+    request: GrantPermissionRequest,
     db: Session = Depends(get_db)
 ):
     result = assistant_service.revoke_permission(
-        db, 
-        doctor_id, 
-        request.assistant_id, 
-        request.patient_id
+        db, doctor_id, request.assistant_id, request.patient_id
     )
     return {"message": "Hasta asistan izni kaldırıldı", "result": result}
+
+
+# ── Tahlil/MR izni güncelleme (doktor yapar) ─────────────────────────
+@router.patch("/{doctor_id}/update_permission")
+def update_assistant_permission(
+    doctor_id: int,
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Body: { assistant_id, patient_id, can_view_labs, can_view_mr }
+    """
+    result = assistant_service.update_permission(
+        db=db,
+        doctor_id=doctor_id,
+        assistant_id=request["assistant_id"],
+        patient_id=request["patient_id"],
+        can_view_labs=request.get("can_view_labs"),
+        can_view_mr=request.get("can_view_mr"),
+    )
+    return {"message": "İzinler güncellendi", "permission": result}
+
+
+# ── Asistanın izinlerini listeleme ───────────────────────────────────
+@router.get("/{doctor_id}/permissions")
+def get_doctor_assistant_permissions(doctor_id: int, db: Session = Depends(get_db)):
+    """Doktorun verdiği tüm asistan izinlerini döner."""
+    return assistant_service.get_permissions_by_doctor(db, doctor_id)
+
 

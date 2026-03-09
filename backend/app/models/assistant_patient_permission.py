@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, String
+from sqlalchemy import Column, Integer, ForeignKey, String, Boolean
 from app.database import Base
 
 class AssistantPatientPermission(Base):
@@ -7,5 +7,7 @@ class AssistantPatientPermission(Base):
     id = Column(Integer, primary_key=True, index=True)
     assistant_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     patient_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    doctor_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))  # izni veren doktor
-    status = Column(String, default="active")  # 'onaylı' veya 'iptal'
+    doctor_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    status = Column(String, default="active")
+    can_view_labs = Column(Boolean, default=False)
+    can_view_mr = Column(Boolean, default=False)

@@ -10,6 +10,13 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
   backend:
     build: ./backend
     depends_on:
@@ -24,6 +31,20 @@ services:
     volumes:
       - ./backend:/app
       - ./backend/uploads:/app/uploads
+
+  celery_worker:
+    build: ./backend
+    container_name: celery_worker
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+      - ./backend/uploads:/app/uploads
+    restart: unless-stopped
 
   frontend:
     build: ./frontend

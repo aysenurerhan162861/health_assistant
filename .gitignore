@@ -41,3 +41,9 @@ frontend/.env
 frontend/.env.local
 
 frontend/public/firebase-messaging-sw.js
+# ML Models
+backend/ml/*.pt
+backend/ml/*.pth
+
+# Hasta verileri
+backend/uploads/

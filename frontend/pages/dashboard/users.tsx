@@ -28,6 +28,9 @@ import {
 import StaffCardModal from "../../components/staff/StaffCardModal";
 import Layout from "../../components/layout/Layout";
 
+import AssistantPermissionManager from "../../components/assistant/AssistantPermissionManager";
+
+
 const UserManagementPage: React.FC = () => {
   const [staffMembers, setStaffMembers] = useState<User[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<User | null>(null);
@@ -218,6 +221,8 @@ const UserManagementPage: React.FC = () => {
           autoHeight
           disableRowSelectionOnClick
         />
+
+        <AssistantPermissionManager />
 
         <Snackbar open={snackbarOpen} autoHideDuration={4000} onClose={() => setSnackbarOpen(false)}>
           <Alert severity="info">{message}</Alert>

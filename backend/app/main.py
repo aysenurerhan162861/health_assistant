@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import users, doctors, patients, assistants, lab_reports, notification, chat_socket, meals, blood_pressure, chat
+from app.api import users, doctors, patients, assistants, lab_reports, notification, chat_socket, meals, blood_pressure, chat, mr_scans
 from app.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -10,6 +10,8 @@ Base.metadata.create_all(bind=engine)
 
 UPLOAD_DIR = "uploads/lab_reports"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs("uploads/mr_scans",    exist_ok=True)  # ← YENİ
+os.makedirs("uploads/mr_masks",    exist_ok=True)
 
 app = FastAPI()
 
@@ -33,3 +35,4 @@ app.include_router(gemini_api.router, prefix="/api/gemini_api")
 app.include_router(notification.router, prefix="/api/notification")
 app.include_router(chat_socket.router, prefix="")
 app.include_router(chat.router, prefix="/api/chat")
+app.include_router(mr_scans.router, prefix="/api/mr_scans")
