@@ -2,7 +2,7 @@ import os
 import shutil
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Header
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
 
 from app.database import get_db
 from app.models.mr_scan import MrScan
@@ -16,6 +16,8 @@ router = APIRouter()
 
 UPLOAD_DIR = "uploads/mr_scans"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+ALLOWED_EXTENSIONS = {".nii", ".nii.gz", ".dcm", ".zip"}
 
 
 def get_current_user_id(
@@ -34,9 +36,15 @@ def get_current_user_id(
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
     return user.id
 
+
+def _is_allowed(filename: str) -> bool:
+    fn = filename.lower()
+    return (fn.endswith(".nii") or fn.endswith(".nii.gz") or
+            fn.endswith(".dcm") or fn.endswith(".zip"))
+
+
 @router.get("/{scan_id}/gradcam")
 def get_gradcam(scan_id: int, db: Session = Depends(get_db)):
-    """Attention haritası (XAI görselleştirme) PNG döndür."""
     scan = db.query(MrScan).filter(MrScan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="MR taraması bulunamadı.")
@@ -48,31 +56,151 @@ def get_gradcam(scan_id: int, db: Session = Depends(get_db)):
 @router.post("/upload", response_model=MrScanResult)
 async def upload_mr_scan(
     patient_id: int = Form(...),
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(default=...),
     db: Session = Depends(get_db)
 ):
-    if not (file.filename.endswith(".nii") or file.filename.endswith(".nii.gz")):
-        raise HTTPException(status_code=400, detail="Sadece .nii veya .nii.gz dosyaları kabul edilir.")
+    """
+    Desteklenen formatlar:
+    - .nii / .nii.gz  — direkt NIfTI
+    - .dcm            — DICOM dosyaları (birden fazla)
+    - .zip            — DICOM'ları içeren ZIP arşivi
 
-    file_path = os.path.join(UPLOAD_DIR, f"{patient_id}_{file.filename}")
-    with open(file_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    Sistem DWI ve ADC sekanslarını otomatik tespit eder.
+    """
+    from app.services.mr_selector import select_dwi_adc_pair
+    from app.services.dicom_converter import convert_dicoms, extract_zip_and_convert
 
+    # ── 1. Dosyaları kaydet ──────────────────────────────────────────
+    saved_nii:  List[str] = []
+    saved_dcm:  List[str] = []
+    saved_zip:  List[str] = []
+    rejected:   List[str] = []
+
+    for file in files:
+        if not _is_allowed(file.filename):
+            rejected.append(file.filename)
+            continue
+
+        dest = os.path.join(UPLOAD_DIR, f"{patient_id}_{file.filename}")
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        fn = file.filename.lower()
+        if fn.endswith(".nii") or fn.endswith(".nii.gz"):
+            saved_nii.append(dest)
+        elif fn.endswith(".dcm"):
+            saved_dcm.append(dest)
+        elif fn.endswith(".zip"):
+            saved_zip.append(dest)
+
+    if not saved_nii and not saved_dcm and not saved_zip:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Geçerli dosya bulunamadı. "
+                f"Desteklenen formatlar: .nii, .nii.gz, .dcm, .zip. "
+                f"Reddedilen: {', '.join(rejected)}"
+            )
+        )
+
+    # ── 2. DICOM → NIfTI çevirme ─────────────────────────────────────
+    nifti_dir = os.path.join(UPLOAD_DIR, f"{patient_id}_converted")
+
+    if saved_dcm:
+        print(f"[upload] {len(saved_dcm)} DICOM dosyası NIfTI'ye çevriliyor...")
+        converted = convert_dicoms(saved_dcm, nifti_dir)
+        saved_nii.extend(converted)
+        # Orijinal DICOM'ları temizle
+        for p in saved_dcm:
+            try: os.remove(p)
+            except OSError: pass
+
+    if saved_zip:
+        for zip_path in saved_zip:
+            print(f"[upload] ZIP çıkarılıyor: {os.path.basename(zip_path)}")
+            converted = extract_zip_and_convert(zip_path, nifti_dir)
+            saved_nii.extend(converted)
+            try: os.remove(zip_path)
+            except OSError: pass
+
+    if not saved_nii:
+        raise HTTPException(
+            status_code=422,
+            detail="DICOM/ZIP dosyaları NIfTI'ye çevrilemedi. Lütfen geçerli MR görüntüleri yükleyin."
+        )
+
+    # ── 3. DWI + ADC çiftini seç ─────────────────────────────────────
+   # ── 3. DWI + ADC çiftini seç ─────────────────────────────────────
+    if len(saved_nii) == 1:
+        file_paths = select_dwi_adc_pair(saved_nii)
+        if file_paths is None or file_paths.get('error') == 'NO_DWI':
+            for p in saved_nii:
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Bu MR paketinde inme analizi için gereken DWI sekansı bulunamadı. "
+                    "Yüklediğiniz paket rutin beyin MR görüntülerini içeriyor. "
+                    "İnme analizi için doktorunuzdan DWI ve ADC sekanslarını içeren "
+                    "bir MR çektirmeniz gerekmektedir."
+                )
+            )
+        selected_reason = "Tek DWI dosyası — DWI ve ADC olarak kullanıldı."
+    else:
+        file_paths = select_dwi_adc_pair(saved_nii)
+
+        if file_paths is None or file_paths.get('error') == 'NO_DWI':
+            for p in saved_nii:
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Bu MR paketinde inme analizi için gereken DWI (Diffusion Weighted Imaging) "
+                    "sekansı bulunamadı. Yüklediğiniz paket rutin beyin MR görüntülerini içeriyor. "
+                    "İnme analizi yapılabilmesi için doktorunuzdan DWI ve ADC sekanslarını içeren "
+                    "bir MR çektirmeniz gerekmektedir."
+                )
+            )
+
+        selected_reason = (
+            f"{len(saved_nii)} dosya arasından otomatik seçildi — "
+            f"DWI: {os.path.basename(file_paths['dwi'])} | "
+            f"ADC: {os.path.basename(file_paths['adc'])}"
+        )
+
+    # Seçilmeyen dosyaları temizle
+    selected = set(file_paths.values())
+    for path in saved_nii:
+        if path not in selected:
+            try: os.remove(path)
+            except OSError: pass
+
+    # ── 4. DB kaydı ──────────────────────────────────────────────────
     scan = MrScan(
         patient_id=patient_id,
-        file_name=file.filename,
-        file_path=file_path,
-        status="pending"
+        file_name=os.path.basename(file_paths['dwi']),
+        file_path=file_paths['dwi'],
+        status="pending",
+        ai_comment=selected_reason,
     )
     db.add(scan)
     db.commit()
     db.refresh(scan)
 
+    # ── 5. Celery task başlat ─────────────────────────────────────────
     from app.tasks.mr_tasks import analyze_mr
-    analyze_mr.delay(scan.id, file_path, patient_id)
+    analyze_mr.delay(scan.id, file_paths, patient_id)
 
     return scan
 
+
+# ── Diğer endpoint'ler değişmedi ─────────────────────────────────────
 
 @router.get("/patient/{patient_id}", response_model=list[MrScanList])
 def get_patient_scans(patient_id: int, db: Session = Depends(get_db)):
@@ -83,12 +211,12 @@ def get_patient_scans(patient_id: int, db: Session = Depends(get_db)):
         .all()
     )
 
+
 @router.get("/doctor/me", response_model=list[MrScanList])
 def get_my_patient_scans(
     db: Session = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id)
 ):
-    """Token'daki doktorun onaylı hastalarına ait tüm MR taramalarını listele."""
     return (
         db.query(MrScan)
         .join(DoctorPatient, MrScan.patient_id == DoctorPatient.patient_id)
@@ -110,6 +238,7 @@ def get_doctor_scans(doctor_id: int, db: Session = Depends(get_db)):
         .all()
     )
 
+
 @router.patch("/{scan_id}/doctor-comment", response_model=MrScanResult)
 def update_doctor_comment(
     scan_id: int,
@@ -117,7 +246,6 @@ def update_doctor_comment(
     db: Session = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id)
 ):
-    """Doktor yorumu ekle veya güncelle."""
     scan = db.query(MrScan).filter(MrScan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="MR taraması bulunamadı.")
@@ -134,6 +262,7 @@ def get_scan_detail(scan_id: int, db: Session = Depends(get_db)):
     if not scan:
         raise HTTPException(status_code=404, detail="MR taraması bulunamadı.")
     return scan
+
 
 @router.get("/{scan_id}/file")
 def download_mr_file(scan_id: int, db: Session = Depends(get_db)):

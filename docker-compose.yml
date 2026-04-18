@@ -44,6 +44,14 @@ services:
     volumes:
       - ./backend:/app
       - ./backend/uploads:/app/uploads
+    # GPU erişimi — HD-BET için
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     restart: unless-stopped
 
   frontend:

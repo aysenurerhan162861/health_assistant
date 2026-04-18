@@ -1,15 +1,21 @@
 {
   "model_name": "AttentionUNet3D",
-  "dataset": "ISLES-2022",
-  "input_channels": 1,
+  "dataset": "ISLES-2022 + OpenNeuro-ds000221",
+  "input_channels": 2,
+  "modalities": [
+    "dwi",
+    "adc"
+  ],
   "target_shape": [
     64,
     64,
     32
   ],
-  "best_epoch": 36,
-  "val_dice": 0.705805008522904,
-  "val_iou": 0.5980863511187197,
-  "threshold": 0.5,
-  "base_filters": 16
+  "best_epoch": 79,
+  "val_dice": 0.6369218942044037,
+  "val_iou": 0.5140638646137502,
+  "threshold": 0.3,
+  "base_filters": 16,
+  "healthy_subjects": 30,
+  "isles_subjects": 250
 }

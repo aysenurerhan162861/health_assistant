@@ -17,20 +17,25 @@ from model import AttentionUNet3D
 
 # ── Model bilgilerini yükle ──────────────────────────────────────────
 INFO_PATH = os.path.join(ML_DIR, 'model_info.json')
-CKPT_PATH = os.path.join(ML_DIR, 'att_unet_best.pt')
+CKPT_PATH = os.path.join(ML_DIR, 'att_unet_multimodal_best.pt')
 
 with open(INFO_PATH) as f:
     MODEL_INFO = json.load(f)
 
 TARGET_SHAPE = tuple(MODEL_INFO['target_shape'])  # (64, 64, 32)
-THRESHOLD    = MODEL_INFO['threshold']             # 0.5
+THRESHOLD    = MODEL_INFO['threshold']             # 0.4
+MODALITIES   = MODEL_INFO['modalities']            # ['dwi', 'adc']
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-_model = AttentionUNet3D(in_ch=1, out_ch=1, base=MODEL_INFO['base_filters']).to(device)
-_ckpt  = torch.load(CKPT_PATH, map_location=device)
+_model = AttentionUNet3D(
+    in_ch=MODEL_INFO['input_channels'],  # 2
+    out_ch=1,
+    base=MODEL_INFO['base_filters']
+).to(device)
+_ckpt = torch.load(CKPT_PATH, map_location=device)
 _model.load_state_dict(_ckpt['model_state_dict'])
 _model.eval()
-print(f"[Celery Worker] Model yüklendi — Cihaz: {device}")
+print(f"[Celery Worker] Multimodal model yüklendi — Modaliteler: {MODALITIES} | Cihaz: {device}")
 
 
 # ── Yardımcı fonksiyonlar ────────────────────────────────────────────
@@ -43,6 +48,44 @@ def _normalize(img: np.ndarray) -> np.ndarray:
 def _resize(vol: np.ndarray, target: tuple) -> np.ndarray:
     factors = [t / s for t, s in zip(target, vol.shape)]
     return zoom(vol, factors, order=1)
+
+
+def _skull_strip(file_path: str) -> np.ndarray:
+    """
+    HD-BET ile skull stripping uygula.
+    Başarısız olursa intensity threshold fallback kullanır.
+    """
+    try:
+        import tempfile, os
+        from hd_bet.run import run_hd_bet
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_path = os.path.join(tmpdir, "stripped.nii.gz")
+            run_hd_bet(file_path, out_path, device="cuda" if torch.cuda.is_available() else "cpu",
+                       do_tta=False, keep_existing_brain_mask=False, overwrite_existing=True)
+            vol = nib.load(out_path).get_fdata()
+            print(f"[Task] HD-BET skull stripping tamamlandı")
+            return vol
+    except Exception as e:
+        print(f"[Task] HD-BET başarısız ({e}), threshold fallback kullanılıyor...")
+        from scipy.ndimage import binary_fill_holes, binary_erosion
+        vol = nib.load(file_path).get_fdata()
+        if vol.ndim == 4:
+            vol = vol[..., 0]
+        thresh = np.percentile(vol[vol > 0], 15) if vol.max() > 0 else 0
+        mask = binary_fill_holes(vol > thresh)
+        mask = binary_erosion(mask, iterations=2)
+        return vol * mask
+
+
+def _load_volume(file_path: str) -> np.ndarray:
+    """NIfTI yükle, skull strip, normalize et, hedef şekle getir."""
+    vol = _skull_strip(file_path)
+    if vol.ndim == 4:
+        vol = vol[..., 0]
+    vol = _normalize(vol)
+    vol = _resize(vol, TARGET_SHAPE)
+    return vol.astype(np.float32)
 
 
 def _generate_comment(lesion_detected: bool, lesion_volume: float, confidence: float) -> str:
@@ -67,88 +110,82 @@ def _generate_comment(lesion_detected: bool, lesion_volume: float, confidence: f
 def _generate_attention_map(tensor: torch.Tensor, scan_id: int) -> str | None:
     """
     Attention U-Net'in att4 gate'inden ısı haritası üret.
-    En aktif axial slice'ı PNG olarak kaydeder.
+    Multimodal tensor (1, 2, H, W, D) — DWI kanalı (0) görselleştirilir.
     """
     try:
         import matplotlib
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
-        import matplotlib.cm as cm
 
         attention_maps = []
 
         def hook_fn(module, input, output):
             attention_maps.append(output.detach().cpu())
 
-        # att4 gate'inin psi (sigmoid) çıktısını yakala
         hook = _model.att4.psi.register_forward_hook(hook_fn)
-
         with torch.no_grad():
             _ = _model(tensor)
-
         hook.remove()
 
         if not attention_maps:
             return None
 
-        # att4 çıktısı: (1, 1, D, H, W) → squeeze → (D, H, W)
-        attn = attention_maps[0].squeeze().numpy()  # (D, H, W) veya (H, W, D)
+        # att4 çıktısı: (1, 1, H, W, D) → squeeze → (H, W, D)
+        attn = attention_maps[0].squeeze().numpy()
 
-        # En aktif axial slice'ı bul (z ekseninde sum)
+        # En aktif axial slice
         slice_scores = attn.sum(axis=(0, 1)) if attn.ndim == 3 else attn.sum(axis=(1, 2))
-        best_slice = int(np.argmax(slice_scores))
+        best_slice   = int(np.argmax(slice_scores))
 
-        # 2D harita al
         if attn.ndim == 3:
-            attn_2d = attn[:, :, best_slice] if attn.shape[2] == attn.shape[2] else attn[best_slice]
+            attn_2d = attn[:, :, best_slice]
         else:
             attn_2d = attn
 
-        # Normalize et
         attn_2d = (attn_2d - attn_2d.min()) / (attn_2d.max() - attn_2d.min() + 1e-8)
 
-        # Orijinal görüntünün aynı slice'ını al
-        orig_slice = tensor.cpu().squeeze().numpy()
-        if orig_slice.ndim == 3:
-            # Attention map boyutuna göre slice seç
-            z_idx = min(best_slice, orig_slice.shape[2] - 1)
-            orig_2d = orig_slice[:, :, z_idx]
-        else:
-            orig_2d = orig_slice
+        # DWI kanalını (kanal 0) görsel için kullan
+        orig_vol = tensor.cpu().squeeze().numpy()  # (2, H, W, D)
+        dwi_vol  = orig_vol[0]                     # (H, W, D)
+        z_idx    = min(best_slice, dwi_vol.shape[2] - 1)
+        orig_2d  = dwi_vol[:, :, z_idx]
 
-        # Boyutları eşitle
+        # ADC kanalı
+        adc_vol = orig_vol[1]
+        adc_2d  = adc_vol[:, :, z_idx]
+
+        # Boyut eşitle
         if orig_2d.shape != attn_2d.shape:
-            attn_2d_resized = zoom(attn_2d, [orig_2d.shape[0] / attn_2d.shape[0],
-                                              orig_2d.shape[1] / attn_2d.shape[1]], order=1)
-        else:
-            attn_2d_resized = attn_2d
+            attn_2d = zoom(attn_2d, [orig_2d.shape[0] / attn_2d.shape[0],
+                                      orig_2d.shape[1] / attn_2d.shape[1]], order=1)
 
-        # Görselleştir: MR + ısı haritası overlay
-        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+        # Görselleştir: DWI | ADC | Attention overlay | Odak yoğunluğu
+        fig, axes = plt.subplots(1, 4, figsize=(16, 4))
         fig.patch.set_facecolor('#1a1a2e')
 
-        # Sol: Orijinal MR
         axes[0].imshow(orig_2d.T, cmap='gray', origin='lower')
-        axes[0].set_title('MR Görüntüsü', color='white', fontsize=11)
+        axes[0].set_title('DWI', color='white', fontsize=11)
         axes[0].axis('off')
 
-        # Orta: Attention haritası
-        axes[1].imshow(orig_2d.T, cmap='gray', origin='lower')
-        axes[1].imshow(attn_2d_resized.T, cmap='jet', alpha=0.5, origin='lower')
-        axes[1].set_title('Attention Haritası (XAI)', color='white', fontsize=11)
+        axes[1].imshow(adc_2d.T, cmap='gray', origin='lower')
+        axes[1].set_title('ADC', color='white', fontsize=11)
         axes[1].axis('off')
 
-        # Sağ: Sadece ısı haritası
-        im = axes[2].imshow(attn_2d_resized.T, cmap='jet', origin='lower')
-        axes[2].set_title('Odak Yoğunluğu', color='white', fontsize=11)
+        axes[2].imshow(orig_2d.T, cmap='gray', origin='lower')
+        axes[2].imshow(attn_2d.T, cmap='jet', alpha=0.5, origin='lower')
+        axes[2].set_title('Attention Haritası (XAI)', color='white', fontsize=11)
         axes[2].axis('off')
-        plt.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
 
-        plt.suptitle(f'Açıklanabilir AI — Slice {best_slice}', color='white', fontsize=13, y=1.02)
+        im = axes[3].imshow(attn_2d.T, cmap='jet', origin='lower')
+        axes[3].set_title('Odak Yoğunluğu', color='white', fontsize=11)
+        axes[3].axis('off')
+        plt.colorbar(im, ax=axes[3], fraction=0.046, pad=0.04)
+
+        plt.suptitle(f'Açıklanabilir AI — DWI+ADC | Slice {best_slice}',
+                     color='white', fontsize=13, y=1.02)
         plt.tight_layout()
 
-        # Kaydet
-        gradcam_dir = os.path.join("uploads", "mr_gradcam")
+        gradcam_dir  = os.path.join("uploads", "mr_gradcam")
         os.makedirs(gradcam_dir, exist_ok=True)
         gradcam_path = os.path.join(gradcam_dir, f"gradcam_{scan_id}.png")
         plt.savefig(gradcam_path, dpi=120, bbox_inches='tight',
@@ -167,9 +204,14 @@ def _generate_attention_map(tensor: torch.Tensor, scan_id: int) -> str | None:
 
 # ── Ana Celery Task ──────────────────────────────────────────────────
 @celery_app.task(bind=True, name="mr_tasks.analyze_mr", acks_late=True)
-def analyze_mr(self, scan_id: int, file_path: str, patient_id: int):
+def analyze_mr(self, scan_id: int, file_paths: dict, patient_id: int):
     """
-    MR görüntüsünü analiz eden arka plan görevi.
+    Multimodal MR görüntüsünü analiz eden arka plan görevi.
+
+    Args:
+        scan_id:    DB'deki MrScan id
+        file_paths: {'dwi': '...', 'adc': '...'}
+        patient_id: Hasta user id
     """
     db = SessionLocal()
     try:
@@ -178,22 +220,27 @@ def analyze_mr(self, scan_id: int, file_path: str, patient_id: int):
         from app.models.doctor_patient import DoctorPatient
 
         print(f"[Task] analyze_mr başladı — scan_id: {scan_id}")
+        print(f"[Task] Dosyalar: DWI={file_paths.get('dwi')} | ADC={file_paths.get('adc')}")
 
-        # ── 1. Görüntüyü yükle ──────────────────────────────────────
-        print(f"[Task] Dosya yükleniyor: {file_path}")
-        vol = nib.load(file_path).get_fdata()
-        if vol.ndim == 4:
-            vol = vol[..., 0]
-        orig_shape = vol.shape
-        print(f"[Task] Shape: {orig_shape}")
+        # ── 1. Her iki modaliteyi yükle ──────────────────────────────
+        dwi_path = file_paths.get('dwi')
+        adc_path = file_paths.get('adc')
 
-        vol = _normalize(vol)
-        vol = _resize(vol, TARGET_SHAPE)
-        print(f"[Task] Resize tamamlandı: {vol.shape}")
+        if not dwi_path or not adc_path:
+            raise ValueError(f"Eksik modalite — file_paths: {file_paths}")
 
-        # ── 2. Model çalıştır ────────────────────────────────────────
+        dwi = _load_volume(dwi_path)
+        adc = _load_volume(adc_path)
+
+        orig_shape = nib.load(dwi_path).get_fdata().shape[:3]
+        print(f"[Task] DWI shape: {dwi.shape} | ADC shape: {adc.shape}")
+
+        # ── 2. Stack → tensor (1, 2, H, W, D) ───────────────────────
+        volume = np.stack([dwi, adc], axis=0)  # (2, H, W, D)
+        tensor = torch.tensor(volume, dtype=torch.float32).unsqueeze(0).to(device)
+
+        # ── 3. Model inference ───────────────────────────────────────
         print("[Task] Model inference başlıyor...")
-        tensor = torch.tensor(vol, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(device)
         with torch.no_grad():
             logits = _model(tensor)
             probs  = torch.sigmoid(logits).cpu().numpy()[0, 0]
@@ -206,23 +253,23 @@ def analyze_mr(self, scan_id: int, file_path: str, patient_id: int):
         mask_orig = zoom(mask, factors, order=0)
         mask_orig = (mask_orig > 0.5).astype(np.float32)
 
-        # ── 3. Metrikler ─────────────────────────────────────────────
+        # ── 4. Metrikler ─────────────────────────────────────────────
         lesion_volume   = float(mask_orig.sum())
         lesion_detected = lesion_volume > 10
         confidence      = float(probs[mask > THRESHOLD].mean()) if mask.sum() > 0 else 0.0
         print(f"[Task] Lezyon: {lesion_detected}, Hacim: {lesion_volume:.1f}, Güven: {confidence:.4f}")
 
-        # ── 4. Maskeyi kaydet ────────────────────────────────────────
+        # ── 5. Maskeyi kaydet ────────────────────────────────────────
         mask_dir  = os.path.join("uploads", "mr_masks")
         os.makedirs(mask_dir, exist_ok=True)
         mask_path = os.path.join(mask_dir, f"mask_{scan_id}.npy")
         np.save(mask_path, mask_orig)
 
-        # ── 5. Attention haritası üret (XAI) ─────────────────────────
+        # ── 6. Attention haritası üret (XAI) ─────────────────────────
         print("[Task] Attention haritası üretiliyor...")
         gradcam_path = _generate_attention_map(tensor, scan_id)
 
-        # ── 6. DB güncelle ───────────────────────────────────────────
+        # ── 7. DB güncelle ───────────────────────────────────────────
         scan = db.query(MrScan).filter(MrScan.id == scan_id).first()
         if scan:
             scan.lesion_detected = lesion_detected
@@ -237,13 +284,15 @@ def analyze_mr(self, scan_id: int, file_path: str, patient_id: int):
                 "lesion_volume":   lesion_volume,
                 "dice_confidence": round(confidence, 4),
                 "model":           MODEL_INFO["model_name"],
+                "modalities":      MODALITIES,
                 "val_dice":        MODEL_INFO["val_dice"],
+                "threshold":       THRESHOLD,
                 "gradcam":         gradcam_path is not None,
             }
             db.commit()
             print(f"[Task] DB güncellendi — status: done")
 
-        # ── 7. Bildirimleri gönder ───────────────────────────────────
+        # ── 8. Bildirimleri gönder ───────────────────────────────────
         doctor_links = db.query(DoctorPatient).filter(
             DoctorPatient.patient_id == patient_id,
             DoctorPatient.status == "onaylandı"
