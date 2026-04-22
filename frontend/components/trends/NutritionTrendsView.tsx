@@ -112,15 +112,15 @@ const NutritionTrendsView: React.FC<NutritionTrendsViewProps> = ({
 
   if (loading) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-        <CircularProgress />
+      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+        <CircularProgress sx={{ color: "#0a2d57" }} />
       </Box>
     );
   }
 
   if (error) {
     return (
-      <Alert severity="error" onClose={() => setError(null)}>
+      <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 2 }}>
         {error}
       </Alert>
     );
@@ -128,7 +128,7 @@ const NutritionTrendsView: React.FC<NutritionTrendsViewProps> = ({
 
   if (!analysis) {
     return (
-      <Alert severity="info">
+      <Alert severity="info" sx={{ borderRadius: 2 }}>
         Analiz verisi bulunamadı. Lütfen daha sonra tekrar deneyin.
       </Alert>
     );
@@ -194,23 +194,25 @@ const NutritionTrendsView: React.FC<NutritionTrendsViewProps> = ({
 
   // Tam görünüm (sayfa için)
   return (
-    <Box sx={{ p: 3, maxWidth: "1400px", mx: "auto" }}>
+    <Box>
       {/* Başlık */}
-      <Box sx={{ mb: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+        borderBottom: "1px solid #e8edf5", pb: 2 }}>
         <Box>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 600, color: "primary.main" }}>
-            Genel Beslenme Alışkanlığı
+          <Typography variant="h6" fontWeight={700} color="#0a2d57">
+            Beslenme Trend Analizi
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Son 30 günlük öğün verilerinize göre hazırlanmış detaylı analiz
+            Son 30 günlük öğün verilerine göre hazırlanmış detaylı analiz
           </Typography>
         </Box>
         <Button
-          variant="outlined"
+          variant="outlined" size="small"
           startIcon={<RefreshIcon />}
           onClick={fetchAnalysis}
           disabled={loading}
-          sx={{ borderRadius: 2 }}
+          sx={{ borderColor: "#d0d7e3", color: "#6b7a90", borderRadius: 2,
+            "&:hover": { bgcolor: "#f0f6ff", borderColor: "#0a2d57", color: "#0a2d57" } }}
         >
           Yenile
         </Button>
@@ -219,121 +221,57 @@ const NutritionTrendsView: React.FC<NutritionTrendsViewProps> = ({
       {/* İstatistik Kartları */}
       {analysis.statistics && (
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }, gap: 3, mb: 4 }}>
-          <Box>
-            <Card
-              sx={{
-                height: "100%",
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                color: "white",
-                borderRadius: 3,
-                boxShadow: 3,
-              }}
-            >
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Ortalama Günlük Kalori
-                    </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 700, mt: 1 }}>
-                      {analysis.statistics.avg_daily_calories.toFixed(0)}
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                      kcal/gün
-                    </Typography>
-                  </Box>
-                  <FireIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+          <Card sx={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", color: "white", borderRadius: 3, boxShadow: 3 }}>
+            <CardContent>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <Box>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>Ortalama Günlük Kalori</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 1 }}>{analysis.statistics.avg_daily_calories.toFixed(0)}</Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>kcal/gün</Typography>
                 </Box>
-              </CardContent>
-            </Card>
-          </Box>
+                <FireIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+              </Box>
+            </CardContent>
+          </Card>
 
-          <Box>
-            <Card
-              sx={{
-                height: "100%",
-                background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-                color: "white",
-                borderRadius: 3,
-                boxShadow: 3,
-              }}
-            >
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Toplam Öğün
-                    </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 700, mt: 1 }}>
-                      {analysis.statistics.total_meals}
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                      son 30 gün
-                    </Typography>
-                  </Box>
-                  <RestaurantIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+          <Card sx={{ background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", color: "white", borderRadius: 3, boxShadow: 3 }}>
+            <CardContent>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <Box>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>Toplam Öğün</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 1 }}>{analysis.statistics.total_meals}</Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>son 30 gün</Typography>
                 </Box>
-              </CardContent>
-            </Card>
-          </Box>
+                <RestaurantIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+              </Box>
+            </CardContent>
+          </Card>
 
-          <Box>
-            <Card
-              sx={{
-                height: "100%",
-                background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-                color: "white",
-                borderRadius: 3,
-                boxShadow: 3,
-              }}
-            >
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Aktif Gün Sayısı
-                    </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 700, mt: 1 }}>
-                      {analysis.statistics.unique_days}
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                      / 30 gün
-                    </Typography>
-                  </Box>
-                  <TrendingUpIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+          <Card sx={{ background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", color: "white", borderRadius: 3, boxShadow: 3 }}>
+            <CardContent>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <Box>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>Aktif Gün Sayısı</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 1 }}>{analysis.statistics.unique_days}</Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>/ 30 gün</Typography>
                 </Box>
-              </CardContent>
-            </Card>
-          </Box>
+                <TrendingUpIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+              </Box>
+            </CardContent>
+          </Card>
 
-          <Box>
-            <Card
-              sx={{
-                height: "100%",
-                background: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-                color: "white",
-                borderRadius: 3,
-                boxShadow: 3,
-              }}
-            >
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Kahvaltı Atlanan
-                    </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 700, mt: 1 }}>
-                      {analysis.statistics.breakfast_skipped}
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                      gün
-                    </Typography>
-                  </Box>
-                  <BreakfastIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+          <Card sx={{ background: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)", color: "white", borderRadius: 3, boxShadow: 3 }}>
+            <CardContent>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <Box>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>Kahvaltı Atlanan</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 1 }}>{analysis.statistics.breakfast_skipped}</Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>gün</Typography>
                 </Box>
-              </CardContent>
-            </Card>
-          </Box>
+                <BreakfastIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+              </Box>
+            </CardContent>
+          </Card>
         </Box>
       )}
 
@@ -341,163 +279,136 @@ const NutritionTrendsView: React.FC<NutritionTrendsViewProps> = ({
       {analysis.statistics && (
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" }, gap: 3, mb: 4 }}>
           {/* Günlük Kalori Trendi */}
-          <Box>
-            <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-                  Son 7 Günlük Kalori Trendi
-                </Typography>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={prepareCalorieTrendData()}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="kalori"
-                      stroke="#667eea"
-                      strokeWidth={3}
-                      dot={{ fill: "#667eea", r: 5 }}
-                      name="Kalori (kcal)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </Box>
+          <Card elevation={0} sx={{ border: "1px solid #e8edf5", borderRadius: 2 }}>
+            <CardContent>
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 700, color: "#0a2d57" }}>
+                Son 7 Günlük Kalori Trendi
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={prepareCalorieTrendData()}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f4fa" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="kalori" stroke="#0a2d57" strokeWidth={3}
+                    dot={{ fill: "#0a2d57", r: 5 }} name="Kalori (kcal)" />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
           {/* Makro Besin Dağılımı */}
-          <Box>
-            <Card sx={{ borderRadius: 3, boxShadow: 2, height: "100%" }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-                  Makro Besin Dağılımı
-                </Typography>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={prepareMacroData()}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, value }) => `${name}: ${value}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {prepareMacroData().map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </Box>
+          <Card elevation={0} sx={{ border: "1px solid #e8edf5", borderRadius: 2 }}>
+            <CardContent>
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 700, color: "#0a2d57" }}>
+                Makro Besin Dağılımı
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={prepareMacroData()} cx="50%" cy="50%" labelLine={false}
+                    label={({ name, value }) => `${name}: ${value}%`}
+                    outerRadius={80} fill="#8884d8" dataKey="value">
+                    {prepareMacroData().map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
           {/* Öğün Tipi Dağılımı */}
-          <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
-            <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-                  Öğün Tipi Dağılımı
-                </Typography>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={prepareMealTypeData()}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="value" name="Öğün Sayısı" fill="#667eea" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </Box>
+          <Card elevation={0} sx={{ border: "1px solid #e8edf5", borderRadius: 2, gridColumn: { xs: "1", md: "1 / -1" } }}>
+            <CardContent>
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 700, color: "#0a2d57" }}>
+                Öğün Tipi Dağılımı
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={prepareMealTypeData()}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f4fa" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="value" name="Öğün Sayısı" fill="#0a2d57" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
         </Box>
       )}
 
       {/* AI Analizi */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 3 }}>
         {/* Özet */}
-        <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
-          <Card sx={{ borderRadius: 3, boxShadow: 2, background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)" }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
-                Genel Değerlendirme
-              </Typography>
-              <Typography variant="body1" paragraph sx={{ lineHeight: 1.8, fontSize: "1.1rem" }}>
-                {analysis.summary}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Box>
+        <Card elevation={0} sx={{ border: "1px solid #e8edf5", borderRadius: 2, bgcolor: "#f8faff", gridColumn: { xs: "1", md: "1 / -1" } }}>
+          <CardContent>
+            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 700, color: "#0a2d57", mb: 1.5 }}>
+              Genel Değerlendirme
+            </Typography>
+            <Typography variant="body2" paragraph sx={{ lineHeight: 1.8, color: "#374151" }}>
+              {analysis.summary}
+            </Typography>
+          </CardContent>
+        </Card>
 
         {/* Olumlu Alışkanlıklar */}
         {analysis.positives && analysis.positives.length > 0 && (
-          <Box>
-            <Card sx={{ borderRadius: 3, boxShadow: 2, height: "100%", borderLeft: "4px solid #4caf50" }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 600 }}>
-                  <CheckCircleIcon color="success" />
-                  Olumlu Alışkanlıklar
-                </Typography>
-                <Box component="ul" sx={{ pl: 2, m: 0 }}>
-                  {analysis.positives.map((item, index) => (
-                    <Box component="li" key={index} sx={{ mb: 1 }}>
-                      <Typography variant="body2">{item}</Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
+          <Card elevation={0} sx={{ border: "1px solid #e8edf5", borderRadius: 2, borderLeft: "4px solid #2e7d32" }}>
+            <CardContent>
+              <Typography variant="subtitle1" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 700, color: "#0a2d57" }}>
+                <CheckCircleIcon sx={{ color: "#2e7d32", fontSize: 20 }} />
+                Olumlu Alışkanlıklar
+              </Typography>
+              <Box component="ul" sx={{ pl: 2, m: 0 }}>
+                {analysis.positives.map((item, index) => (
+                  <Box component="li" key={index} sx={{ mb: 1 }}>
+                    <Typography variant="body2">{item}</Typography>
+                  </Box>
+                ))}
+              </Box>
+            </CardContent>
+          </Card>
         )}
 
         {/* Dikkat Edilmesi Gerekenler */}
         {analysis.warnings && analysis.warnings.length > 0 && (
-          <Box>
-            <Card sx={{ borderRadius: 3, boxShadow: 2, height: "100%", borderLeft: "4px solid #ff9800" }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 600 }}>
-                  <WarningIcon color="warning" />
-                  Dikkat Edilmesi Gereken Noktalar
-                </Typography>
-                <Box component="ul" sx={{ pl: 2, m: 0 }}>
-                  {analysis.warnings.map((item, index) => (
-                    <Box component="li" key={index} sx={{ mb: 1 }}>
-                      <Typography variant="body2">{item}</Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
+          <Card elevation={0} sx={{ border: "1px solid #e8edf5", borderRadius: 2, borderLeft: "4px solid #e65100" }}>
+            <CardContent>
+              <Typography variant="subtitle1" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 700, color: "#0a2d57" }}>
+                <WarningIcon sx={{ color: "#e65100", fontSize: 20 }} />
+                Dikkat Edilmesi Gereken Noktalar
+              </Typography>
+              <Box component="ul" sx={{ pl: 2, m: 0 }}>
+                {analysis.warnings.map((item, index) => (
+                  <Box component="li" key={index} sx={{ mb: 1 }}>
+                    <Typography variant="body2">{item}</Typography>
+                  </Box>
+                ))}
+              </Box>
+            </CardContent>
+          </Card>
         )}
 
         {/* Öneriler */}
         {analysis.recommendations && analysis.recommendations.length > 0 && (
-          <Box>
-            <Card sx={{ borderRadius: 3, boxShadow: 2, height: "100%", borderLeft: "4px solid #2196f3" }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 600 }}>
-                  <LightbulbIcon color="primary" />
-                  Öneriler
-                </Typography>
-                <Box component="ul" sx={{ pl: 2, m: 0 }}>
-                  {analysis.recommendations.map((item, index) => (
-                    <Box component="li" key={index} sx={{ mb: 1 }}>
-                      <Typography variant="body2">{item}</Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
+          <Card elevation={0} sx={{ border: "1px solid #e8edf5", borderRadius: 2, borderLeft: "4px solid #1565c0" }}>
+            <CardContent>
+              <Typography variant="subtitle1" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1, fontWeight: 700, color: "#0a2d57" }}>
+                <LightbulbIcon sx={{ color: "#1565c0", fontSize: 20 }} />
+                Öneriler
+              </Typography>
+              <Box component="ul" sx={{ pl: 2, m: 0 }}>
+                {analysis.recommendations.map((item, index) => (
+                  <Box component="li" key={index} sx={{ mb: 1 }}>
+                    <Typography variant="body2">{item}</Typography>
+                  </Box>
+                ))}
+              </Box>
+            </CardContent>
+          </Card>
         )}
       </Box>
     </Box>

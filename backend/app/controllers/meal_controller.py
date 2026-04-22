@@ -103,6 +103,40 @@ async def add_meal(
             os.remove(saved_image_path)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
+    # 🔔 Doktor ve asistanlara bildirim
+    from app.services.notification_service import notify_event
+    from app.models.doctor_patient import AssistantPermission
+
+    doctor_relation = db.query(DoctorPatient).filter(
+        DoctorPatient.patient_id == current_user.id,
+        DoctorPatient.status == "onaylandı"
+    ).first()
+    if doctor_relation:
+        await notify_event(
+            db=db,
+            user_id=doctor_relation.doctor_id,
+            event_name="meal_uploaded",
+            title="Hasta Öğün Ekledi",
+            body=f"{current_user.name} yeni bir öğün kaydı ekledi."
+        )
+        # Asistanlara da bildirim
+        try:
+            from app.models.assistant_patient_permission import AssistantPatientPermission
+            assistants = db.query(AssistantPatientPermission).filter(
+                AssistantPatientPermission.patient_id == current_user.id,
+                AssistantPatientPermission.status == "active"
+            ).all()
+            for ap in assistants:
+                await notify_event(
+                    db=db,
+                    user_id=ap.assistant_id,
+                    event_name="meal_uploaded",
+                    title="Hasta Öğün Ekledi",
+                    body=f"{current_user.name} yeni bir öğün kaydı ekledi."
+                )
+        except Exception:
+            pass
+
     return meal
 
 

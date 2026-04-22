@@ -2,10 +2,12 @@
 import React, { useState } from "react";
 import {
   Button, Box, Typography, Dialog, DialogTitle,
-  DialogContent, DialogActions, Alert, LinearProgress, IconButton,
+  DialogContent, Alert, LinearProgress, IconButton, Stack,
 } from "@mui/material";
 import BiotechIcon from "@mui/icons-material/Biotech";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CloseIcon from "@mui/icons-material/Close";
+import SaveIcon from "@mui/icons-material/Save";
 import axios from "axios";
 
 interface Props {
@@ -13,12 +15,17 @@ interface Props {
   onUploadSuccess: () => void;
 }
 
-const ALLOWED_EXTENSIONS = [".nii", ".nii.gz", ".dcm", ".zip"];
-
 const isAllowed = (filename: string): boolean => {
   const fn = filename.toLowerCase();
   return fn.endsWith(".nii") || fn.endsWith(".nii.gz") ||
          fn.endsWith(".dcm") || fn.endsWith(".zip");
+};
+
+const fileIcon = (name: string): string => {
+  const fn = name.toLowerCase();
+  if (fn.endsWith(".zip")) return "🗜️";
+  if (fn.endsWith(".dcm")) return "🏥";
+  return "📄";
 };
 
 const UploadMrScan: React.FC<Props> = ({ patientId, onUploadSuccess }) => {
@@ -32,50 +39,35 @@ const UploadMrScan: React.FC<Props> = ({ patientId, onUploadSuccess }) => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files ?? []);
-
-    const invalid = selected.filter(f => !isAllowed(f.name));
+    const invalid  = selected.filter((f) => !isAllowed(f.name));
     if (invalid.length > 0) {
-      setError(
-        `Geçersiz dosya(lar): ${invalid.map(f => f.name).join(", ")} — ` +
-        `Desteklenen formatlar: .nii, .nii.gz, .dcm, .zip`
-      );
+      setError(`Geçersiz dosya(lar): ${invalid.map((f) => f.name).join(", ")} — Desteklenen formatlar: .nii, .nii.gz, .dcm, .zip`);
       return;
     }
-
     setError(null);
-    setFiles(prev => {
-      const existing = new Set(prev.map(f => f.name));
-      const yeni = selected.filter(f => !existing.has(f.name));
-      return [...prev, ...yeni];
+    setFiles((prev) => {
+      const existing = new Set(prev.map((f) => f.name));
+      return [...prev, ...selected.filter((f) => !existing.has(f.name))];
     });
-
     e.target.value = "";
   };
 
-  const handleRemove = (name: string) => {
-    setFiles(prev => prev.filter(f => f.name !== name));
-  };
+  const handleRemove = (name: string) => setFiles((prev) => prev.filter((f) => f.name !== name));
 
   const handleUpload = async () => {
     if (files.length === 0) return;
-
     const formData = new FormData();
-    files.forEach(f => formData.append("files", f));
+    files.forEach((f) => formData.append("files", f));
     formData.append("patient_id", String(patientId));
-
     const token = localStorage.getItem("token") || "";
     try {
       setLoading(true);
       await axios.post("http://localhost:8000/api/mr_scans/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          "token-header": `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "multipart/form-data", "token-header": `Bearer ${token}` },
       });
       onUploadSuccess();
       handleClose();
     } catch (err: any) {
-      console.error("MR upload failed:", err);
       const detail = err?.response?.data?.detail;
       setError(detail || "MR yükleme başarısız. Lütfen tekrar deneyin.");
     } finally {
@@ -85,117 +77,123 @@ const UploadMrScan: React.FC<Props> = ({ patientId, onUploadSuccess }) => {
 
   const totalMB = files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
 
-  // Dosya tipine göre ikon
-  const fileIcon = (name: string) => {
-    const fn = name.toLowerCase();
-    if (fn.endsWith(".zip"))  return "🗜️";
-    if (fn.endsWith(".dcm"))  return "🏥";
-    return "📄";
-  };
-
   return (
-    <Box sx={{ mb: 3 }}>
+    <>
       <Button
-        variant="contained"
-        startIcon={<BiotechIcon />}
-        onClick={handleOpen}
-        sx={{ backgroundColor: "#0a2d57", "&:hover": { backgroundColor: "#082147" } }}
+        variant="contained" startIcon={<BiotechIcon />} onClick={handleOpen}
+        sx={{ bgcolor: "#6a1b9a", "&:hover": { bgcolor: "#4a148c" } }}
       >
         Yeni MR Yükle
       </Button>
 
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>MR Görüntüsü Yükle</DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}>
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
+        <DialogTitle sx={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          borderBottom: "1px solid #e8edf5", pb: 1.5,
+        }}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <BiotechIcon sx={{ color: "#6a1b9a" }} />
+            <Typography fontWeight={700} color="#0a2d57">MR Görüntüsü Yükle</Typography>
+          </Stack>
+          <IconButton size="small" onClick={handleClose} sx={{ color: "#9aa5b4" }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
 
-          <Alert severity="info" icon={false}>
-            📂 <strong>MR dosyalarınızı seçin.</strong> Sistem, inme analizi için
-            DWI ve ADC sekanslarını otomatik olarak tespit edecektir.
-          </Alert>
+        <DialogContent sx={{ pt: 2.5 }}>
+          <Stack spacing={2}>
+            <Alert severity="info" icon={false} sx={{ borderRadius: 2 }}>
+              <Typography variant="body2">
+                <strong>📂 MR dosyalarınızı seçin.</strong> Sistem, inme analizi için DWI ve ADC sekanslarını
+                otomatik olarak tespit edecektir.
+              </Typography>
+            </Alert>
 
-          <Typography variant="body2" color="text.secondary">
-            Desteklenen formatlar:{" "}
-            <strong>.dcm</strong> (DICOM),{" "}
-            <strong>.zip</strong> (DICOM arşivi),{" "}
-            <strong>.nii / .nii.gz</strong> (NIfTI)
-          </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Desteklenen formatlar:{" "}
+              <strong>.dcm</strong> (DICOM), <strong>.zip</strong> (DICOM arşivi),{" "}
+              <strong>.nii / .nii.gz</strong> (NIfTI)
+            </Typography>
 
-          {/* Dosya seçme alanı */}
-          <Box sx={{
-            border: "2px dashed #ccc", borderRadius: 2, p: 3, textAlign: "center",
-            "&:hover": { borderColor: "#0a2d57", backgroundColor: "#f5f8ff" },
-            cursor: "pointer",
-          }}>
-            <input
-              type="file"
-              accept=".nii,.nii.gz,.dcm,.zip"
-              multiple
-              onChange={handleFileChange}
-              style={{ display: "none" }}
-              id="mr-file-input"
-            />
-            <label htmlFor="mr-file-input" style={{ cursor: "pointer" }}>
-              <BiotechIcon sx={{ fontSize: 40, color: "#0a2d57", mb: 1 }} />
-              <Typography>Dosya seçmek için tıklayın</Typography>
+            {/* Drag-drop alanı */}
+            <Box
+              component="label" htmlFor="mr-file-input"
+              sx={{
+                border: "2px dashed #d0d7e3", borderRadius: 2, p: 4,
+                textAlign: "center", cursor: "pointer", display: "block",
+                transition: "all .2s",
+                "&:hover": { borderColor: "#6a1b9a", bgcolor: "#faf4ff" },
+              }}
+            >
+              <input
+                id="mr-file-input" type="file"
+                accept=".nii,.nii.gz,.dcm,.zip" multiple
+                onChange={handleFileChange}
+                style={{ display: "none" }}
+              />
+              <CloudUploadIcon sx={{ fontSize: 40, color: "#6a1b9a", mb: 1 }} />
+              <Typography fontWeight={600} color="#0a2d57">Dosya seçmek için tıklayın</Typography>
               <Typography variant="caption" color="text.secondary">
-                DICOM (.dcm), ZIP arşivi veya NIfTI (.nii/.nii.gz) yükleyebilirsiniz
+                DICOM (.dcm), ZIP arşivi veya NIfTI (.nii / .nii.gz)
               </Typography>
-            </label>
-          </Box>
-
-          {/* Seçilen dosyalar listesi */}
-          {files.length > 0 && (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <Typography variant="body2" fontWeight={600}>
-                Seçilen dosyalar ({files.length} adet — {totalMB.toFixed(1)} MB):
-              </Typography>
-              {files.map(f => (
-                <Box
-                  key={f.name}
-                  sx={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    backgroundColor: "#f0f4ff", borderRadius: 1, px: 1.5, py: 0.5,
-                  }}
-                >
-                  <Typography variant="body2" noWrap sx={{ maxWidth: 340 }}>
-                    {fileIcon(f.name)} {f.name}{" "}
-                    <Typography component="span" variant="caption" color="text.secondary">
-                      ({(f.size / 1024 / 1024).toFixed(1)} MB)
-                    </Typography>
-                  </Typography>
-                  <IconButton size="small" onClick={() => handleRemove(f.name)} disabled={loading}>
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              ))}
             </Box>
-          )}
 
-          {error && <Alert severity="error">{error}</Alert>}
+            {/* Seçilen dosyalar */}
+            {files.length > 0 && (
+              <Box>
+                <Typography variant="body2" fontWeight={600} mb={1}>
+                  Seçilen dosyalar ({files.length} adet — {totalMB.toFixed(1)} MB):
+                </Typography>
+                <Stack spacing={0.75}>
+                  {files.map((f) => (
+                    <Box key={f.name} sx={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      bgcolor: "#f3e8ff", borderRadius: 1.5, px: 1.5, py: 0.75,
+                    }}>
+                      <Typography variant="body2" noWrap sx={{ maxWidth: 340 }}>
+                        {fileIcon(f.name)} {f.name}{" "}
+                        <Typography component="span" variant="caption" color="text.secondary">
+                          ({(f.size / 1024 / 1024).toFixed(1)} MB)
+                        </Typography>
+                      </Typography>
+                      <IconButton size="small" onClick={() => handleRemove(f.name)} disabled={loading}>
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            )}
 
-          {loading && (
-            <Box>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                Yükleniyor ve analiz kuyruğuna alınıyor...
-              </Typography>
-              <LinearProgress />
-            </Box>
-          )}
+            {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
+
+            {loading && (
+              <Box>
+                <Typography variant="body2" mb={1} color="text.secondary">
+                  Yükleniyor ve analiz kuyruğuna alınıyor...
+                </Typography>
+                <LinearProgress sx={{ borderRadius: 1, "& .MuiLinearProgress-bar": { bgcolor: "#6a1b9a" } }} />
+              </Box>
+            )}
+
+            {/* Butonlar */}
+            <Stack direction="row" justifyContent="flex-end" spacing={1} pt={0.5}>
+              <Button onClick={handleClose} disabled={loading} sx={{ color: "#6b7a90" }}>
+                İptal
+              </Button>
+              <Button
+                variant="contained" startIcon={<SaveIcon />}
+                onClick={handleUpload} disabled={files.length === 0 || loading}
+                sx={{ bgcolor: "#6a1b9a", "&:hover": { bgcolor: "#4a148c" } }}
+              >
+                {loading ? "Yükleniyor..." : "Yükle ve Analiz Et"}
+              </Button>
+            </Stack>
+          </Stack>
         </DialogContent>
-
-        <DialogActions>
-          <Button onClick={handleClose} disabled={loading}>İptal</Button>
-          <Button
-            variant="contained"
-            onClick={handleUpload}
-            disabled={files.length === 0 || loading}
-            sx={{ backgroundColor: "#0a2d57", "&:hover": { backgroundColor: "#082147" } }}
-          >
-            {loading ? "Yükleniyor..." : `Yükle ve Analiz Et`}
-          </Button>
-        </DialogActions>
       </Dialog>
-    </Box>
+    </>
   );
 };
 

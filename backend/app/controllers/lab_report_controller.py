@@ -52,16 +52,38 @@ async def upload_lab_report(
     )
     report = create_lab_report(db, report_data)
 
-    # 🔔 Doktor için bildirim
-    doctor_relation = db.query(DoctorPatient).filter(DoctorPatient.patient_id == patient_id).first()
+    # 🔔 Doktor bildirimi
+    doctor_relation = db.query(DoctorPatient).filter(
+        DoctorPatient.patient_id == patient_id,
+        DoctorPatient.status == "onaylandı"
+    ).first()
     if doctor_relation:
-        await notify_event(   # ← burası artık await ediliyor
+        await notify_event(
             db=db,
             user_id=doctor_relation.doctor_id,
             event_name="lab_uploaded",
             title="Yeni Tahlil Yüklendi",
             body=f"Hasta yeni bir tahlil yükledi: {file.filename}"
         )
+
+        # 🔔 can_view_labs=True olan asistanlara bildirim
+        try:
+            from app.models.assistant_patient_permission import AssistantPatientPermission
+            assistants = db.query(AssistantPatientPermission).filter(
+                AssistantPatientPermission.patient_id == patient_id,
+                AssistantPatientPermission.status == "active",
+                AssistantPatientPermission.can_view_labs == True
+            ).all()
+            for ap in assistants:
+                await notify_event(
+                    db=db,
+                    user_id=ap.assistant_id,
+                    event_name="lab_uploaded",
+                    title="Hasta Tahlil Yükledi",
+                    body=f"Takip ettiğiniz hasta yeni bir tahlil raporu yükledi."
+                )
+        except Exception:
+            pass
 
     return report
 # Hasta kendi raporlarını listeler

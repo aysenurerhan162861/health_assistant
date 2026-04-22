@@ -1,19 +1,17 @@
-"use client"; // sayfanın sadece client-side çalışmasını sağlar
-
-import React from "react";
+"use client";
+import { useEffect, useState } from "react";
+import Layout from "../../../components/layout/Layout";
 import PendingPatients from "../../../components/patients/PendingPatients";
-import Navbar from "../../../components/layout/Navbar";
-import Sidebar from "../../../components/layout/Sidebar";
 
 const PendingPatientsPage = () => {
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => { setIsClient(true); }, []);
+  if (!isClient) return null;
+
   return (
-    <>
-      <Navbar />
-      <Sidebar />
-      <div style={{ marginLeft: 260, marginTop: 80, padding: "20px" }}>
-        <PendingPatients />
-      </div>
-    </>
+    <Layout>
+      <PendingPatients />
+    </Layout>
   );
 };
 

@@ -25,10 +25,24 @@ class UserOut(BaseModel):
     name: Optional[str] = None
     email: str
     role: UserRole
-    diploma_number: Optional[str] = None
-    workplace: Optional[str] = None
-    specialization: Optional[str] = None
-    profile_image: Optional[str] = None
+    phone: Optional[str] = None
+    birth_date: Optional[date] = None
+    gender: Optional[str] = None
+    city: Optional[str] = None
+    district: Optional[str] = None
+    neighborhood: Optional[str] = None
+    blood_type: Optional[str] = None
+    chronic_diseases: Optional[str] = None
+    allergies: Optional[str] = None
+    photo_url: Optional[str] = None
+    branch: Optional[str] = None
+    experience: Optional[int] = None
+    institution: Optional[str] = None
+    diploma_no: Optional[str] = None
+    certifications: Optional[str] = None
+    about: Optional[str] = None
+    must_change_password: Optional[bool] = None
+    parent_id: Optional[int] = None
 
     model_config = {
         "from_attributes": True

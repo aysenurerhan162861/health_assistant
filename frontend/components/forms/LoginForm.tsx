@@ -1,22 +1,18 @@
-// components/forms/LoginForm.tsx
 import React, { useState } from "react";
 import { useRouter } from "next/router";
 import { loginUser, ApiResponse } from "../../services/api";
 import {
-  TextField,
-  Button,
-  Avatar,
-  Typography,
-  Link,
-  Box,
-  InputAdornment,
+  TextField, Button, Typography, Link, Box, InputAdornment, CircularProgress,
 } from "@mui/material";
-import { Email, Lock } from "@mui/icons-material";
+import EmailIcon  from "@mui/icons-material/Email";
+import LockIcon   from "@mui/icons-material/Lock";
+import FavoriteIcon from "@mui/icons-material/Favorite";
 
 export default function LoginForm() {
   const router = useRouter();
   const [formData, setFormData] = useState({ email: "", password: "" });
-  const [message, setMessage] = useState("");
+  const [message, setMessage]   = useState("");
+  const [loading, setLoading]   = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -25,6 +21,7 @@ export default function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage("");
+    setLoading(true);
     try {
       const res: ApiResponse = await loginUser(formData);
       if (res.error) {
@@ -32,84 +29,90 @@ export default function LoginForm() {
       } else if (res.token && res.user) {
         localStorage.setItem("token", res.token);
         localStorage.setItem("user", JSON.stringify(res.user));
-        setMessage("Giriş başarılı!");
         if (res.user.must_change_password) {
-        router.push("/change-password"); // yeni şifre sayfasına yönlendir
-      } else {
-        setTimeout(() => router.push("/dashboard"), 500); // normal yönlendirme
+          router.push("/change-password");
+        } else {
+          setTimeout(() => router.push("/dashboard"), 400);
+        }
       }
-      }
-    } catch (err) {
-      setMessage("Giriş başarısız!");
+    } catch {
+      setMessage("Giriş başarısız. Lütfen bilgilerinizi kontrol edin.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%", textAlign: "center" }}>
-      {/* Avatar */}
-      <Avatar sx={{ bgcolor: "#1976d2", mb: 2, width: 60, height: 60, margin: "0 auto" }} />
+    <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%" }}>
+      {/* Başlık */}
+      <Box sx={{ textAlign: "center", mb: 3 }}>
+        <Box sx={{
+          width: 56, height: 56, borderRadius: "50%",
+          bgcolor: "#e3f0ff", display: "flex",
+          alignItems: "center", justifyContent: "center",
+          mx: "auto", mb: 2,
+        }}>
+          <FavoriteIcon sx={{ color: "#0a2d57", fontSize: 28 }} />
+        </Box>
+        <Typography variant="h6" fontWeight={700} color="#0a2d57">Hoş Geldiniz</Typography>
+        <Typography variant="body2" color="text.secondary" mt={0.5}>
+          Hesabınıza giriş yapın
+        </Typography>
+      </Box>
 
       <TextField
-        fullWidth
-        margin="normal"
-        name="email"
-        type="email"
-        placeholder="Email"
-        value={formData.email}
-        onChange={handleChange}
-        required
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <Email sx={{ color: "gray" }} />
-            </InputAdornment>
-          ),
+        fullWidth size="small" margin="normal"
+        name="email" type="email" label="E-posta"
+        value={formData.email} onChange={handleChange} required
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <EmailIcon sx={{ color: "#9aa5b4", fontSize: 18 }} />
+              </InputAdornment>
+            ),
+          },
         }}
       />
 
       <TextField
-        fullWidth
-        margin="normal"
-        name="password"
-        type="password"
-        placeholder="Şifre"
-        value={formData.password}
-        onChange={handleChange}
-        required
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <Lock sx={{ color: "gray" }} />
-            </InputAdornment>
-          ),
+        fullWidth size="small" margin="normal"
+        name="password" type="password" label="Şifre"
+        value={formData.password} onChange={handleChange} required
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <LockIcon sx={{ color: "#9aa5b4", fontSize: 18 }} />
+              </InputAdornment>
+            ),
+          },
         }}
       />
 
       <Button
-        type="submit"
-        variant="contained"
-        fullWidth
+        type="submit" variant="contained" fullWidth disabled={loading}
         sx={{
-          mt: 2,
-          bgcolor: "#1976d2",
-          borderRadius: "12px",
-          py: 1.2,
-          fontWeight: "bold",
+          mt: 2.5, py: 1.3, borderRadius: 2, fontWeight: 700, fontSize: 15,
+          bgcolor: "#0a2d57", "&:hover": { bgcolor: "#071d3c" },
+          textTransform: "none",
         }}
       >
-        Giriş
+        {loading ? <CircularProgress size={22} sx={{ color: "white" }} /> : "Giriş Yap"}
       </Button>
 
-      {/* Geri bildirim */}
       {message && (
-        <Typography variant="body2" sx={{ mt: 2, color: message.includes("başarılı") ? "green" : "red" }}>
+        <Typography variant="body2" sx={{
+          mt: 1.5, textAlign: "center",
+          color: message.includes("başarılı") ? "#2e7d32" : "#c62828",
+        }}>
           {message}
         </Typography>
       )}
 
-      <Typography variant="body2" sx={{ mt: 2, color: "gray" }}>
+      <Typography variant="body2" sx={{ mt: 2.5, textAlign: "center", color: "#6b7a90" }}>
         Hesabınız yok mu?{" "}
-        <Link href="/register" underline="hover">
+        <Link href="/register" underline="hover" sx={{ color: "#0a2d57", fontWeight: 600 }}>
           Kayıt Ol
         </Link>
       </Typography>

@@ -29,14 +29,9 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
     return res  # token ve user JSON olarak dönüyor
 
 # Protected route
-@router.get("/me")
+@router.get("/me", response_model=UserOut)
 def read_users_me(current_user: User = Depends(get_current_user)):
-    return {
-        "id": current_user.id,
-        "name": current_user.name,
-        "email": current_user.email,
-        "role": current_user.role
-    }
+    return current_user
 
 @router.post("/update", response_model=UserOut)
 def update_user(

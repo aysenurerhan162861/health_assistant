@@ -27,6 +27,17 @@ export const getAssistantPatients = async (assistantId: number) => {
 };
 
 /**
+ * Asistanın bağlı olduğu doktoru getir
+ */
+export const getMyDoctor = async (): Promise<{ doctor_id: number; doctor_name: string }> => {
+  const token = localStorage.getItem("token") || "";
+  const response = await axios.get(`${BASE_URL}/me/doctor`, {
+    headers: { "token-header": `Bearer ${token}` },
+  });
+  return response.data;
+};
+
+/**
  * Doktorun asistandan izin kaldırması
  */
 export const revokePatientPermission = async (

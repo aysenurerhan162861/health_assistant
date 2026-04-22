@@ -193,7 +193,41 @@ async def upload_mr_scan(
     db.commit()
     db.refresh(scan)
 
-    # ── 5. Celery task başlat ─────────────────────────────────────────
+    # ── 5. Doktor ve asistanlara bildirim ────────────────────────────
+    from app.services.notification_service import notify_event
+    from app.models.doctor_patient import DoctorPatient as _DP
+
+    doctor_rel = db.query(_DP).filter(
+        _DP.patient_id == patient_id,
+        _DP.status == "onaylandı"
+    ).first()
+    if doctor_rel:
+        await notify_event(
+            db=db,
+            user_id=doctor_rel.doctor_id,
+            event_name="mr_uploaded",
+            title="Hasta MR Görüntüsü Yükledi",
+            body=f"Hasta #{patient_id} yeni bir MR görüntüsü yükledi."
+        )
+        try:
+            from app.models.assistant_patient_permission import AssistantPatientPermission
+            assistants = db.query(AssistantPatientPermission).filter(
+                AssistantPatientPermission.patient_id == patient_id,
+                AssistantPatientPermission.status == "active",
+                AssistantPatientPermission.can_view_mr == True
+            ).all()
+            for ap in assistants:
+                await notify_event(
+                    db=db,
+                    user_id=ap.assistant_id,
+                    event_name="mr_uploaded",
+                    title="Hasta MR Görüntüsü Yükledi",
+                    body=f"Hasta #{patient_id} yeni bir MR görüntüsü yükledi."
+                )
+        except Exception:
+            pass
+
+    # ── 6. Celery task başlat ─────────────────────────────────────────
     from app.tasks.mr_tasks import analyze_mr
     analyze_mr.delay(scan.id, file_paths, patient_id)
 
@@ -253,6 +287,23 @@ def update_doctor_comment(
     scan.viewed_by_doctor = True
     db.commit()
     db.refresh(scan)
+
+    # 🔔 Hasta için bildirim
+    try:
+        doctor = db.query(User).filter(User.id == current_user_id).first()
+        doctor_name = doctor.name if doctor else "Doktorunuz"
+        from app.services.notification_service import notify
+        notify(
+            db=db,
+            user_id=scan.patient_id,
+            event="doctor_comment",
+            title="Doktor Yorum Ekledi",
+            body=f"{doctor_name} MR görüntünüz için yorum yaptı.",
+            metadata={"scan_id": scan.id}
+        )
+    except Exception:
+        pass
+
     return scan
 
 

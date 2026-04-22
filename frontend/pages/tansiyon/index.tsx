@@ -3,641 +3,402 @@
 import React, { useEffect, useState } from "react";
 import Layout from "@/components/layout/Layout";
 import {
-  Box,
-  Typography,
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  CircularProgress,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  TextField,
-  Grid,
-  Card,
-  CardContent,
-  Alert,
-  Chip,
-  IconButton,
+  Box, Typography, Button, Card, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, CircularProgress, Dialog,
+  DialogTitle, DialogContent, DialogActions, TextField,
+  Alert, Stack, Chip, Grid, CardContent, IconButton, Collapse,
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import AddIcon from "@mui/icons-material/Add";
+import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import CloseIcon from "@mui/icons-material/Close";
+import SaveIcon from "@mui/icons-material/Save";
+import SendIcon from "@mui/icons-material/Send";
+import EditIcon from "@mui/icons-material/Edit";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import {
   BloodPressureTrackingListItem,
   BloodPressureTracking,
   BloodPressureTrackingCreate,
 } from "@/types/BloodPressure";
-import {
-  getMyTrackings,
-  getTracking,
-  createTracking,
-  updateTracking,
-  sendToDoctor,
-} from "@/services/BloodPressureApi";
+import { getMyTrackings, getTracking, createTracking, updateTracking, sendToDoctor } from "@/services/BloodPressureApi";
+
+const getBPStatus = (systolic: number | null, diastolic: number | null) => {
+  if (systolic === null || diastolic === null) return null;
+  if (systolic >= 140 || diastolic >= 90) return { label: "Yüksek", bgcolor: "#ffebee", color: "#c62828" };
+  if (systolic >= 120 || diastolic >= 80) return { label: "Sınırda", bgcolor: "#fff3e0", color: "#e65100" };
+  return { label: "Normal", bgcolor: "#e8f5e9", color: "#2e7d32" };
+};
+
+const generateMeasurementTimes = (start: string, end: string, period: number): string[] => {
+  const times: string[] = [];
+  const [sh = "0", sm = "0"] = start.split(":");
+  const [eh = "0", em = "0"] = end.split(":");
+  const startMin = parseInt(sh) * 60 + parseInt(sm);
+  const endMin = parseInt(eh) * 60 + parseInt(em);
+  const periodMin = period * 60;
+  if (startMin >= endMin || periodMin <= 0) return times;
+  let cur = startMin;
+  while (cur <= endMin) {
+    times.push(`${Math.floor(cur / 60).toString().padStart(2, "0")}:${(cur % 60).toString().padStart(2, "0")}`);
+    cur += periodMin;
+  }
+  return times;
+};
 
 const TansiyonPage: React.FC = () => {
-  const [trackings, setTrackings] = useState<BloodPressureTrackingListItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [accordionOpen, setAccordionOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [trackings, setTrackings]           = useState<BloodPressureTrackingListItem[]>([]);
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState<string | null>(null);
+  const [success, setSuccess]               = useState<string | null>(null);
 
-  // Ana accordion form state (sadece takip oluşturma için)
-  const [date, setDate] = useState<string>("");
-  const [startTime, setStartTime] = useState<string>("08:00");
-  const [endTime, setEndTime] = useState<string>("20:00");
-  const [periodHours, setPeriodHours] = useState<number>(2);
+  // Yeni takip dialog
+  const [dialogOpen, setDialogOpen]         = useState(false);
+  const [submitting, setSubmitting]         = useState(false);
+  const [date, setDate]                     = useState("");
+  const [startTime, setStartTime]           = useState("08:00");
+  const [endTime, setEndTime]               = useState("20:00");
+  const [periodHours, setPeriodHours]       = useState(2);
 
-  // Tablodaki accordion state (ölçüm girişi için)
-  const [openRowId, setOpenRowId] = useState<number | null>(null);
+  // Satır ölçüm accordion
+  const [openRowId, setOpenRowId]           = useState<number | null>(null);
   const [trackingDetails, setTrackingDetails] = useState<BloodPressureTracking | null>(null);
   const [rowMeasurements, setRowMeasurements] = useState<
-    Array<{ measurement_time: string; systolic: number | null; diastolic: number | null }>
+    { measurement_time: string; systolic: number | null; diastolic: number | null }[]
   >([]);
-  const [savingRowId, setSavingRowId] = useState<number | null>(null);
+  const [savingRowId, setSavingRowId]       = useState<number | null>(null);
 
-  // Tansiyon kayıtlarını yükle
   const fetchTrackings = async () => {
     setLoading(true);
+    try { setTrackings(await getMyTrackings()); }
+    catch (err: any) { setError(err.response?.data?.detail || "Tansiyon kayıtları yüklenemedi"); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchTrackings(); }, []);
+
+  const handleCreate = async () => {
+    if (!date) { setError("Lütfen tarih seçin."); return; }
+    if (!startTime || !endTime) { setError("Başlangıç ve bitiş saatlerini seçin."); return; }
+    if (periodHours <= 0) { setError("Periyot 0'dan büyük olmalıdır."); return; }
+    setSubmitting(true); setError(null);
     try {
-      const data = await getMyTrackings();
-      setTrackings(data);
-    } catch (err: any) {
-      console.error("Tansiyon kayıtları yüklenemedi:", err);
-      setError(err.response?.data?.detail || err.message || "Tansiyon kayıtları yüklenemedi");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTrackings();
-  }, []);
-
-  // Periyoda göre ölçüm saatlerini oluştur
-  const generateMeasurementTimes = (
-    start: string,
-    end: string,
-    period: number
-  ): string[] => {
-    const times: string[] = [];
-    const startParts = start.split(":");
-    const endParts = end.split(":");
-    
-    if (startParts.length !== 2 || endParts.length !== 2) {
-      return times;
-    }
-    
-    const startHourStr = startParts[0];
-    const startMinStr = startParts[1];
-    const endHourStr = endParts[0];
-    const endMinStr = endParts[1];
-    
-    if (!startHourStr || !startMinStr || !endHourStr || !endMinStr) {
-      return times;
-    }
-    
-    const startHour = parseInt(startHourStr, 10);
-    const startMin = parseInt(startMinStr, 10);
-    const endHour = parseInt(endHourStr, 10);
-    const endMin = parseInt(endMinStr, 10);
-
-    if (isNaN(startHour) || isNaN(startMin) || isNaN(endHour) || isNaN(endMin)) {
-      return times;
-    }
-
-    const startMinutes = startHour * 60 + startMin;
-    const endMinutes = endHour * 60 + endMin;
-    const periodMinutes = period * 60;
-
-    if (startMinutes >= endMinutes || periodMinutes <= 0) {
-      return times;
-    }
-
-    let currentMinutes = startMinutes;
-    while (currentMinutes <= endMinutes) {
-      const hours = Math.floor(currentMinutes / 60);
-      const minutes = currentMinutes % 60;
-      times.push(`${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`);
-      currentMinutes += periodMinutes;
-    }
-
-    return times;
-  };
-
-  // Ana accordion aç/kapat
-  const handleAccordionChange = (event: React.SyntheticEvent, isExpanded: boolean) => {
-    setAccordionOpen(isExpanded);
-    if (!isExpanded) {
-      // Accordion kapandığında formu sıfırla
-      setDate("");
-      setStartTime("08:00");
-      setEndTime("20:00");
-      setPeriodHours(2);
-      setError(null);
-      setSuccess(null);
-    }
-  };
-
-  // Ana accordion: Yeni takip oluştur (ölçümler olmadan)
-  const handleCreateTracking = async () => {
-    if (!date) {
-      setError("Lütfen tarih seçin.");
-      return;
-    }
-
-    if (!startTime || !endTime) {
-      setError("Lütfen başlangıç ve bitiş saatlerini seçin.");
-      return;
-    }
-
-    if (periodHours <= 0) {
-      setError("Periyot 0'dan büyük olmalıdır.");
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      // Boş ölçümlerle takip oluştur
       const times = generateMeasurementTimes(startTime, endTime, periodHours);
-      const emptyMeasurements = times.map((time) => ({
-        measurement_time: time,
-        systolic: null,
-        diastolic: null,
-      }));
-
-      const trackingData: BloodPressureTrackingCreate = {
-        date,
-        start_time: startTime,
-        end_time: endTime,
-        period_hours: periodHours,
-        measurements: emptyMeasurements,
+      const data: BloodPressureTrackingCreate = {
+        date, start_time: startTime, end_time: endTime, period_hours: periodHours,
+        measurements: times.map((t) => ({ measurement_time: t, systolic: null, diastolic: null })),
       };
-
-      await createTracking(trackingData);
-      setSuccess("Tansiyon takibi başarıyla oluşturuldu. Ölçümleri tablodan girebilirsiniz.");
-      setAccordionOpen(false);
+      await createTracking(data);
+      setSuccess("Tansiyon takibi oluşturuldu. Ölçümleri tablodan girebilirsiniz.");
+      setDialogOpen(false);
+      setDate(""); setStartTime("08:00"); setEndTime("20:00"); setPeriodHours(2);
       fetchTrackings();
-      
-      // Formu sıfırla
-      setDate("");
-      setStartTime("08:00");
-      setEndTime("20:00");
-      setPeriodHours(2);
     } catch (err: any) {
-      console.error("Tansiyon takibi oluşturulamadı:", err);
-      setError(err.response?.data?.detail || err.message || "Tansiyon takibi oluşturulamadı");
-    } finally {
-      setSubmitting(false);
-    }
+      setError(err.response?.data?.detail || "Tansiyon takibi oluşturulamadı");
+    } finally { setSubmitting(false); }
   };
 
-  // Tablodaki accordion aç/kapat
   const toggleRowAccordion = async (trackingId: number) => {
     if (openRowId === trackingId) {
-      setOpenRowId(null);
-      setTrackingDetails(null);
-      setRowMeasurements([]);
-      return;
+      setOpenRowId(null); setTrackingDetails(null); setRowMeasurements([]); return;
     }
-
     try {
       setOpenRowId(trackingId);
       const details = await getTracking(trackingId);
       setTrackingDetails(details);
-      
-      // Ölçümleri formatla
-      const formattedMeasurements = details.measurements.map((m) => ({
-        measurement_time: m.measurement_time,
-        systolic: m.systolic,
-        diastolic: m.diastolic,
-      }));
-      setRowMeasurements(formattedMeasurements);
+      setRowMeasurements(details.measurements.map((m) => ({
+        measurement_time: m.measurement_time, systolic: m.systolic, diastolic: m.diastolic,
+      })));
     } catch (err: any) {
-      console.error("Takip detayları yüklenemedi:", err);
-      setError(err.response?.data?.detail || err.message || "Takip detayları yüklenemedi");
+      setError(err.response?.data?.detail || "Takip detayları yüklenemedi");
     }
   };
 
-  // Tablodaki ölçüm değerlerini güncelle
-  const handleRowMeasurementChange = (
-    index: number,
-    field: "systolic" | "diastolic",
-    value: string
-  ) => {
-    const newMeasurements = [...rowMeasurements];
-    if (newMeasurements[index]) {
-      newMeasurements[index] = {
-        ...newMeasurements[index],
-        [field]: value === "" ? null : parseInt(value, 10),
-      };
-      setRowMeasurements(newMeasurements);
-    }
+  const handleMeasurementChange = (index: number, field: "systolic" | "diastolic", value: string) => {
+    setRowMeasurements((prev) => prev.map((m, i) =>
+      i === index ? { ...m, [field]: value === "" ? null : parseInt(value, 10) } : m
+    ));
   };
 
-  // Tablodaki ölçümleri kaydet
-  const handleSaveRowMeasurements = async (trackingId: number) => {
+  const handleSave = async (trackingId: number, sendToDoctorAfter = false) => {
     if (!trackingDetails) return;
-
-    setSavingRowId(trackingId);
-    setError(null);
-    setSuccess(null);
-
+    setSavingRowId(trackingId); setError(null); setSuccess(null);
     try {
-      const trackingData: BloodPressureTrackingCreate = {
-        date: trackingDetails.date,
-        start_time: trackingDetails.start_time,
-        end_time: trackingDetails.end_time,
-        period_hours: trackingDetails.period_hours,
+      const data: BloodPressureTrackingCreate = {
+        date: trackingDetails.date, start_time: trackingDetails.start_time,
+        end_time: trackingDetails.end_time, period_hours: trackingDetails.period_hours,
         measurements: rowMeasurements,
       };
-
-      await updateTracking(trackingId, trackingData);
-      setSuccess("Ölçümler başarıyla kaydedildi.");
-      
-      // Verileri yeniden yükle
+      await updateTracking(trackingId, data);
+      if (sendToDoctorAfter) await sendToDoctor(trackingId);
+      setSuccess(sendToDoctorAfter ? "Ölçümler kaydedildi ve doktora gönderildi." : "Ölçümler kaydedildi.");
       await fetchTrackings();
-      
-      // Accordion'u kapat
-      setOpenRowId(null);
-      setTrackingDetails(null);
-      setRowMeasurements([]);
+      setOpenRowId(null); setTrackingDetails(null); setRowMeasurements([]);
     } catch (err: any) {
-      console.error("Ölçümler kaydedilemedi:", err);
-      setError(err.response?.data?.detail || err.message || "Ölçümler kaydedilemedi");
-    } finally {
-      setSavingRowId(null);
-    }
-  };
-
-  // Tablodaki ölçümleri doktora gönder
-  const handleSendRowToDoctor = async (trackingId: number) => {
-    if (!trackingDetails) return;
-
-    setSavingRowId(trackingId);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      // Önce ölçümleri kaydet
-      const trackingData: BloodPressureTrackingCreate = {
-        date: trackingDetails.date,
-        start_time: trackingDetails.start_time,
-        end_time: trackingDetails.end_time,
-        period_hours: trackingDetails.period_hours,
-        measurements: rowMeasurements,
-      };
-
-      await updateTracking(trackingId, trackingData);
-      
-      // Sonra doktora gönder
-      await sendToDoctor(trackingId);
-      
-      setSuccess("Ölçümler kaydedildi ve doktora gönderildi.");
-      
-      // Verileri yeniden yükle
-      await fetchTrackings();
-      
-      // Accordion'u kapat
-      setOpenRowId(null);
-      setTrackingDetails(null);
-      setRowMeasurements([]);
-    } catch (err: any) {
-      console.error("Doktora gönderilemedi:", err);
-      setError(err.response?.data?.detail || err.message || "Doktora gönderilemedi");
-    } finally {
-      setSavingRowId(null);
-    }
+      setError(err.response?.data?.detail || "İşlem başarısız");
+    } finally { setSavingRowId(null); }
   };
 
   return (
     <Layout>
-      <Box sx={{ mt: 6, mb: 3 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-          <Typography variant="h5">Tansiyon Takibi</Typography>
-        </Box>
-
-        {error && (
-          <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert severity="success" onClose={() => setSuccess(null)} sx={{ mb: 2 }}>
-            {success}
-          </Alert>
-        )}
-
-        {/* Ana Accordion: Yeni Takip Oluşturma */}
-        <Box sx={{ mb: 3 }}>
-          <Accordion expanded={accordionOpen} onChange={handleAccordionChange}>
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
-              sx={{
-                bgcolor: accordionOpen ? "#0a2d57" : "#f5f5f5",
-                color: accordionOpen ? "white" : "inherit",
-                "&:hover": {
-                  bgcolor: accordionOpen ? "#082147" : "#e0e0e0",
-                },
-              }}
+      <Box sx={{ maxWidth: 1100, mx: "auto" }}>
+        {/* Başlık */}
+        <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <Box>
+            <Typography variant="h5" fontWeight={700} color="#0a2d57">Tansiyon Takibim</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Tansiyon ölçümlerinizi kaydedin ve doktorunuza gönderin
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Chip
+              icon={<MonitorHeartIcon fontSize="small" />}
+              label={`${trackings.length} kayıt`}
+              sx={{ bgcolor: "#fce4ec", color: "#c62828", fontWeight: 600 }}
+            />
+            <Button
+              variant="contained" startIcon={<AddIcon />}
+              onClick={() => { setDialogOpen(true); setError(null); }}
+              sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#071d3c" }, borderRadius: 2 }}
             >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <AddIcon />
-                <Typography variant="h6">Yeni Tansiyon Takibi Oluştur</Typography>
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      label="Tarih"
-                      type="date"
-                      fullWidth
-                      required
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      InputLabelProps={{
-                        shrink: true,
-                      }}
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 3 }}>
-                    <TextField
-                      label="Başlangıç Saati"
-                      type="time"
-                      fullWidth
-                      required
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      InputLabelProps={{
-                        shrink: true,
-                      }}
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 3 }}>
-                    <TextField
-                      label="Bitiş Saati"
-                      type="time"
-                      fullWidth
-                      required
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      InputLabelProps={{
-                        shrink: true,
-                      }}
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      label="Periyot (Saat)"
-                      type="number"
-                      fullWidth
-                      required
-                      value={periodHours}
-                      onChange={(e) => setPeriodHours(parseInt(e.target.value, 10) || 1)}
-                      inputProps={{ min: 1, max: 24 }}
-                    />
-                  </Grid>
-                </Grid>
-
-                <Box sx={{ display: "flex", gap: 2, mt: 2, justifyContent: "flex-end" }}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => setAccordionOpen(false)}
-                    disabled={submitting}
-                  >
-                    İptal
-                  </Button>
-                  <Button
-                    variant="contained"
-                    onClick={handleCreateTracking}
-                    disabled={submitting}
-                    sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#082147" } }}
-                  >
-                    {submitting ? "Oluşturuluyor..." : "Oluştur"}
-                  </Button>
-                </Box>
-              </Box>
-            </AccordionDetails>
-          </Accordion>
+              Yeni Takip Oluştur
+            </Button>
+          </Stack>
         </Box>
+
+        {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+        {success && <Alert severity="success" onClose={() => setSuccess(null)} sx={{ mb: 2, borderRadius: 2 }}>{success}</Alert>}
 
         {/* Tablo */}
         {loading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 5 }}>
-            <CircularProgress />
+          <Box sx={{ display: "flex", justifyContent: "center", pt: 8 }}>
+            <CircularProgress sx={{ color: "#c62828" }} />
           </Box>
         ) : (
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow sx={{ backgroundColor: "#f0f0f0" }}>
-                  <TableCell sx={{ fontWeight: "bold" }}>Tarih</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Başlangıç Saati</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Bitiş Saati</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Periyot</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Ölçüm Sayısı</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Durum</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>İşlemler</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {trackings.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                      <Typography color="text.secondary">
-                        Henüz tansiyon takibi eklenmemiş.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  trackings.map((tracking) => (
-                    <React.Fragment key={tracking.id}>
-                      <TableRow hover>
-                        <TableCell>
-                          {new Date(tracking.date).toLocaleDateString("tr-TR", {
-                            year: "numeric",
-                            month: "2-digit",
-                            day: "2-digit",
-                          })}
-                        </TableCell>
-                        <TableCell>{tracking.start_time}</TableCell>
-                        <TableCell>{tracking.end_time}</TableCell>
-                        <TableCell>{tracking.period_hours} saat</TableCell>
-                        <TableCell>
-                          {tracking.completed_count} / {tracking.measurement_count}
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={tracking.is_completed === "tamamlandı" ? "Tamamlandı" : "Eksik"}
-                            color={tracking.is_completed === "tamamlandı" ? "success" : "warning"}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => toggleRowAccordion(tracking.id)}
-                            sx={{ minWidth: 100 }}
-                          >
-                            {openRowId === tracking.id ? "Kapat" : "Ölçümler"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-
-                      {/* Accordion satırı - Ölçüm girişi */}
-                      {openRowId === tracking.id && trackingDetails && (
-                        <TableRow>
-                          <TableCell colSpan={7} sx={{ py: 3, backgroundColor: "#f7f9fc" }}>
-                            <Box
+          <Card elevation={0} sx={{ border: "1px solid #e8edf5", borderRadius: 2, overflow: "hidden" }}>
+            {trackings.length === 0 ? (
+              <Box sx={{ py: 8, textAlign: "center" }}>
+                <MonitorHeartIcon sx={{ fontSize: 40, color: "#d0d7e3", mb: 1 }} />
+                <Typography color="text.secondary">Henüz tansiyon takibi oluşturulmamış.</Typography>
+              </Box>
+            ) : (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: "#f8faff" }}>
+                      <TableCell sx={{ fontWeight: 700, color: "#0a2d57", borderColor: "#e8edf5" }}>Tarih</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#0a2d57", borderColor: "#e8edf5" }}>Başlangıç</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#0a2d57", borderColor: "#e8edf5" }}>Bitiş</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#0a2d57", borderColor: "#e8edf5" }}>Periyot</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#0a2d57", borderColor: "#e8edf5" }}>Tamamlanan</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#0a2d57", borderColor: "#e8edf5" }}>Durum</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#0a2d57", borderColor: "#e8edf5" }}>İşlem</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {trackings.map((t) => (
+                      <React.Fragment key={t.id}>
+                        <TableRow sx={{ "&:hover": { bgcolor: "#f0f6ff" } }}>
+                          <TableCell sx={{ borderColor: "#f0f4fa", fontWeight: 500, color: "#1a2e4a" }}>
+                            {new Date(t.date).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                          </TableCell>
+                          <TableCell sx={{ borderColor: "#f0f4fa", color: "#444" }}>{t.start_time}</TableCell>
+                          <TableCell sx={{ borderColor: "#f0f4fa", color: "#444" }}>{t.end_time}</TableCell>
+                          <TableCell sx={{ borderColor: "#f0f4fa" }}>
+                            <Chip label={`${t.period_hours}s`} size="small"
+                              sx={{ bgcolor: "#f3f4f6", color: "#555", fontWeight: 500, fontSize: 11 }} />
+                          </TableCell>
+                          <TableCell sx={{ borderColor: "#f0f4fa", color: "#6b7a90" }}>
+                            {t.completed_count} / {t.measurement_count}
+                          </TableCell>
+                          <TableCell sx={{ borderColor: "#f0f4fa" }}>
+                            <Chip
+                              label={t.is_completed === "tamamlandı" ? "Tamamlandı" : "Eksik"} size="small"
                               sx={{
-                                p: 2,
-                                borderRadius: 2,
-                                boxShadow: 1,
-                                border: "1px solid #e0e7ef",
+                                bgcolor: t.is_completed === "tamamlandı" ? "#e8f5e9" : "#fff3e0",
+                                color: t.is_completed === "tamamlandı" ? "#2e7d32" : "#e65100",
+                                fontWeight: 600, fontSize: 11,
                               }}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ borderColor: "#f0f4fa" }}>
+                            <Button
+                              variant="outlined" size="small"
+                              startIcon={openRowId === t.id ? <ExpandLessIcon fontSize="small" /> : <EditIcon fontSize="small" />}
+                              onClick={() => toggleRowAccordion(t.id)}
+                              sx={{ borderColor: "#0a2d57", color: "#0a2d57", fontSize: 11,
+                                "&:hover": { bgcolor: "#e3f0ff" } }}
                             >
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  mb: 2,
-                                }}
-                              >
-                                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                                  Tansiyon Ölçümleri
-                                </Typography>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => {
-                                    setOpenRowId(null);
-                                    setTrackingDetails(null);
-                                    setRowMeasurements([]);
-                                  }}
-                                >
-                                  <CloseIcon />
-                                </IconButton>
-                              </Box>
-
-                              <Box
-                                sx={{
-                                  maxHeight: "500px",
-                                  overflowY: "auto",
-                                  mb: 2,
-                                }}
-                              >
-                                <Grid container spacing={2}>
-                                  {rowMeasurements.map((measurement, index) => (
-                                    <Grid size={{ xs: 12, sm: 6, md: 4 }} key={index}>
-                                      <Card variant="outlined" sx={{ height: "100%" }}>
-                                        <CardContent>
-                                          <Typography
-                                            variant="subtitle2"
-                                            sx={{
-                                              mb: 1.5,
-                                              fontWeight: "bold",
-                                              color: "#0a2d57",
-                                              textAlign: "center",
-                                            }}
-                                          >
-                                            {measurement.measurement_time}
-                                          </Typography>
-                                          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                                            <TextField
-                                              label="Sistolik"
-                                              type="number"
-                                              fullWidth
-                                              size="small"
-                                              value={measurement.systolic || ""}
-                                              onChange={(e) =>
-                                                handleRowMeasurementChange(
-                                                  index,
-                                                  "systolic",
-                                                  e.target.value
-                                                )
-                                              }
-                                              inputProps={{ min: 0, max: 300 }}
-                                            />
-                                            <TextField
-                                              label="Diyastolik"
-                                              type="number"
-                                              fullWidth
-                                              size="small"
-                                              value={measurement.diastolic || ""}
-                                              onChange={(e) =>
-                                                handleRowMeasurementChange(
-                                                  index,
-                                                  "diastolic",
-                                                  e.target.value
-                                                )
-                                              }
-                                              inputProps={{ min: 0, max: 200 }}
-                                            />
-                                          </Box>
-                                        </CardContent>
-                                      </Card>
-                                    </Grid>
-                                  ))}
-                                </Grid>
-                              </Box>
-
-                              <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
-                                <Button
-                                  variant="outlined"
-                                  onClick={() => {
-                                    setOpenRowId(null);
-                                    setTrackingDetails(null);
-                                    setRowMeasurements([]);
-                                  }}
-                                  disabled={savingRowId === tracking.id}
-                                >
-                                  İptal
-                                </Button>
-                                <Button
-                                  variant="contained"
-                                  onClick={() => handleSaveRowMeasurements(tracking.id)}
-                                  disabled={savingRowId === tracking.id}
-                                  sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#082147" } }}
-                                >
-                                  {savingRowId === tracking.id ? "Kaydediliyor..." : "Kaydet"}
-                                </Button>
-                                <Button
-                                  variant="contained"
-                                  onClick={() => handleSendRowToDoctor(tracking.id)}
-                                  disabled={savingRowId === tracking.id}
-                                  sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#082147" } }}
-                                >
-                                  {savingRowId === tracking.id
-                                    ? "Gönderiliyor..."
-                                    : "Doktora Gönder"}
-                                </Button>
-                              </Box>
-                            </Box>
+                              {openRowId === t.id ? "Kapat" : "Ölçümler"}
+                            </Button>
                           </TableCell>
                         </TableRow>
-                      )}
-                    </React.Fragment>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+
+                        {/* Ölçüm giriş alanı */}
+                        <TableRow>
+                          <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
+                            <Collapse in={openRowId === t.id && !!trackingDetails}>
+                              <Box sx={{ m: 2, p: 2.5, bgcolor: "#f8faff", borderRadius: 2, border: "1px solid #e0e7ef" }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                                  <Typography variant="subtitle2" fontWeight={700} color="#0a2d57">
+                                    Tansiyon Ölçümleri
+                                  </Typography>
+                                  <IconButton size="small" onClick={() => { setOpenRowId(null); setTrackingDetails(null); setRowMeasurements([]); }}>
+                                    <CloseIcon fontSize="small" />
+                                  </IconButton>
+                                </Stack>
+
+                                <Box sx={{ maxHeight: 420, overflowY: "auto", mb: 2 }}>
+                                  <Grid container spacing={1.5}>
+                                    {rowMeasurements.map((m, idx) => {
+                                      const bpStatus = getBPStatus(m.systolic, m.diastolic);
+                                      return (
+                                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={idx}>
+                                          <Card variant="outlined" sx={{
+                                            borderColor: bpStatus ? bpStatus.bgcolor : "#e8edf5",
+                                            bgcolor: bpStatus ? bpStatus.bgcolor + "55" : "white",
+                                          }}>
+                                            <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+                                              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                                                <Typography variant="subtitle2" fontWeight={700} color="#0a2d57">
+                                                  {m.measurement_time}
+                                                </Typography>
+                                                {bpStatus && (
+                                                  <Chip label={bpStatus.label} size="small"
+                                                    sx={{ bgcolor: bpStatus.bgcolor, color: bpStatus.color,
+                                                      fontWeight: 600, fontSize: 10, height: 18 }} />
+                                                )}
+                                              </Stack>
+                                              <Stack spacing={1}>
+                                                <TextField
+                                                  label="Sistolik" type="number" fullWidth size="small"
+                                                  value={m.systolic ?? ""}
+                                                  onChange={(e) => handleMeasurementChange(idx, "systolic", e.target.value)}
+                                                  slotProps={{ htmlInput: { min: 0, max: 300 } }}
+                                                />
+                                                <TextField
+                                                  label="Diyastolik" type="number" fullWidth size="small"
+                                                  value={m.diastolic ?? ""}
+                                                  onChange={(e) => handleMeasurementChange(idx, "diastolic", e.target.value)}
+                                                  slotProps={{ htmlInput: { min: 0, max: 200 } }}
+                                                />
+                                              </Stack>
+                                            </CardContent>
+                                          </Card>
+                                        </Grid>
+                                      );
+                                    })}
+                                  </Grid>
+                                </Box>
+
+                                <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+                                  <Button
+                                    variant="outlined" size="small"
+                                    onClick={() => { setOpenRowId(null); setTrackingDetails(null); setRowMeasurements([]); }}
+                                    disabled={savingRowId === t.id}
+                                    sx={{ color: "#6b7a90", borderColor: "#d0d7e3" }}
+                                  >
+                                    İptal
+                                  </Button>
+                                  <Button
+                                    variant="contained" size="small"
+                                    startIcon={<SaveIcon fontSize="small" />}
+                                    onClick={() => handleSave(t.id)}
+                                    disabled={savingRowId === t.id}
+                                    sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#071d3c" } }}
+                                  >
+                                    {savingRowId === t.id ? "Kaydediliyor..." : "Kaydet"}
+                                  </Button>
+                                  <Button
+                                    variant="contained" size="small"
+                                    startIcon={<SendIcon fontSize="small" />}
+                                    onClick={() => handleSave(t.id, true)}
+                                    disabled={savingRowId === t.id}
+                                    sx={{ bgcolor: "#1565c0", "&:hover": { bgcolor: "#0d47a1" } }}
+                                  >
+                                    {savingRowId === t.id ? "Gönderiliyor..." : "Doktora Gönder"}
+                                  </Button>
+                                </Stack>
+                              </Box>
+                            </Collapse>
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Card>
         )}
       </Box>
+
+      {/* Yeni Takip Dialog */}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth
+        slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
+        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+          borderBottom: "1px solid #e8edf5", fontWeight: 700, color: "#0a2d57" }}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <MonitorHeartIcon sx={{ color: "#c62828" }} />
+            <span>Yeni Tansiyon Takibi</span>
+          </Stack>
+          <IconButton size="small" onClick={() => setDialogOpen(false)} sx={{ color: "#9aa5b4" }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                label="Tarih" type="date" fullWidth required
+                value={date} onChange={(e) => setDate(e.target.value)}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                label="Başlangıç Saati" type="time" fullWidth required
+                value={startTime} onChange={(e) => setStartTime(e.target.value)}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                label="Bitiş Saati" type="time" fullWidth required
+                value={endTime} onChange={(e) => setEndTime(e.target.value)}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                label="Periyot (Saat)" type="number" fullWidth required
+                value={periodHours}
+                onChange={(e) => setPeriodHours(parseInt(e.target.value, 10) || 1)}
+                slotProps={{ htmlInput: { min: 1, max: 24 } }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Box sx={{ p: 1.5, bgcolor: "#f8faff", borderRadius: 2, border: "1px solid #e8edf5" }}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Ölçüm sayısı
+                </Typography>
+                <Typography variant="h6" fontWeight={700} color="#0a2d57">
+                  {generateMeasurementTimes(startTime, endTime, periodHours).length} ölçüm
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setDialogOpen(false)} disabled={submitting} sx={{ color: "#6b7a90" }}>
+            İptal
+          </Button>
+          <Button
+            variant="contained" onClick={handleCreate} disabled={submitting}
+            sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#071d3c" } }}
+          >
+            {submitting ? "Oluşturuluyor..." : "Oluştur"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Layout>
   );
 };

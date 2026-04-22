@@ -32,7 +32,7 @@ const DoctorsPage: React.FC = () => {
 
   return (
     <Layout user={user}>
-      <Box sx={{ mt: 10, mx: 3 }}>
+      <Box>
         <PatientDoctors openDoctorId={openDoctorId} />
       </Box>
     </Layout>

@@ -5,7 +5,6 @@ from app.schemas.lab_report_schema import LabReportCreate
 from datetime import datetime
 from app.models.doctor_patient import DoctorPatient
 from app.models.lab_test import LabTest
-from app.services.notification_service import notify
 
 def create_lab_report(db: Session, report_data: LabReportCreate):
     parsed_data = report_data.parsed_data or {"tests": []}
@@ -32,22 +31,7 @@ def create_lab_report(db: Session, report_data: LabReportCreate):
         db.add(lab_test)
     db.commit()
 
-    # Bildirim gönder
-    doctor_links = db.query(DoctorPatient).filter(
-        DoctorPatient.patient_id == report_data.patient_id,
-        DoctorPatient.status == "onaylandı"
-    ).all()
-
-    for link in doctor_links:
-        notify(
-            db=db,
-            user_id=link.doctor_id,
-            event="lab_uploaded",
-            title="Yeni Tahlil Yüklendi",
-            body=f"Hastanızın yeni tahlil raporu yüklendi: {report.file_name}",
-            metadata={"lab_report_id": report.id}
-        )
-
+    # Bildirimler async context'te (lab_report_controller) gönderiliyor.
     return report
 
 def get_lab_reports_by_patient(db: Session, patient_id: int) -> list[LabReport]:

@@ -47,6 +47,7 @@ const AssistantMealsPage: React.FC = () => {
           meal={selectedMeal}
           onUpdate={(updated) => setMeals(prev => prev.map(m => m.id === updated.id ? { ...m, ...updated } : m))}
           userRole="assistant"
+          allMeals={meals}
         />
       </Box>
     </Layout>

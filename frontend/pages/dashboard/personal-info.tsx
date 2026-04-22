@@ -6,7 +6,7 @@ import CitizenForm from "../../components/forms/CitizenForm";
 import DoctorForm from "../../components/forms/DoctorForm";
 import StaffForm from "../../components/forms/StaffForm";
 import { getMe, User } from "../../services/api";
-import { Box, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 
 const PersonalInfoPage: React.FC = () => {
   const router = useRouter();
@@ -18,15 +18,12 @@ const PersonalInfoPage: React.FC = () => {
       try {
         const me: User = await getMe();
         setUser(me);
-      } catch (err) {
-        console.error(err);
+      } catch {
         router.push("/login");
       }
     }
     fetchUser();
-
-    const kvkk = localStorage.getItem("kvkk") === "true";
-    setIsConsentGiven(kvkk);
+    setIsConsentGiven(localStorage.getItem("kvkk") === "true");
   }, [router]);
 
   if (!user) return <p>Yükleniyor...</p>;
@@ -41,22 +38,10 @@ const PersonalInfoPage: React.FC = () => {
           }}
         />
       ) : (
-        <Box sx={{ mt: 10, mx: 3 }}> {/* 🔹 Navbar + Sidebar boşluğu kadar yukarıdan margin */}
-          <Typography variant="h5" gutterBottom>
-            Kişisel Bilgiler
-          </Typography>
-
-          {user.role === "citizen" && (
-            <CitizenForm user={user} setUser={setUser} />
-          )}
-
-          {user.role === "doctor" && (
-            <DoctorForm user={user} setUser={setUser} />
-          )}
-
-          {user.role === "assistant" && (
-            <StaffForm user={user} setUser={setUser} isSubUser={true} />
-          )}
+        <Box sx={{ maxWidth: 1100, mx: "auto" }}>
+          {user.role === "citizen"   && <CitizenForm user={user} setUser={setUser} />}
+          {user.role === "doctor"    && <DoctorForm  user={user} setUser={setUser} />}
+          {user.role === "assistant" && <StaffForm   user={user} setUser={setUser} isSubUser />}
         </Box>
       )}
     </Layout>

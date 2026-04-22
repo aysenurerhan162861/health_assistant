@@ -107,24 +107,42 @@ def create_blood_pressure_tracking(
     # Bildirim gönder
     if send_notification:
         from app.services.notification_service import notify
-        
+
         # Onaylı doktorları bul
         doctor_links = db.query(DoctorPatient).filter(
             DoctorPatient.patient_id == patient.id,
             DoctorPatient.status == "onaylandı"
         ).all()
-        
-        # Her doktora bildirim gönder
+
         for link in doctor_links:
             notify(
                 db=db,
                 user_id=link.doctor_id,
                 event="blood_pressure_completed",
                 title="Tansiyon Takibi Tamamlandı",
-                body=f"Hastanız günlük tansiyon takibini tamamladı.",
+                body="Hastanız günlük tansiyon takibini tamamladı.",
                 metadata={"tracking_id": tracking.id, "patient_id": patient.id}
             )
-    
+
+        # Aktif asistanlara bildirim
+        try:
+            from app.models.assistant_patient_permission import AssistantPatientPermission
+            assistants = db.query(AssistantPatientPermission).filter(
+                AssistantPatientPermission.patient_id == patient.id,
+                AssistantPatientPermission.status == "active"
+            ).all()
+            for ap in assistants:
+                notify(
+                    db=db,
+                    user_id=ap.assistant_id,
+                    event="blood_pressure_completed",
+                    title="Hasta Tansiyon Tamamladı",
+                    body="Takip ettiğiniz hasta günlük tansiyon takibini tamamladı.",
+                    metadata={"tracking_id": tracking.id, "patient_id": patient.id}
+                )
+        except Exception:
+            pass
+
     return tracking
 
 
@@ -226,24 +244,41 @@ def update_blood_pressure_tracking(
     # Bildirim gönder
     if send_notification:
         from app.services.notification_service import notify
-        
-        # Onaylı doktorları bul
+
         doctor_links = db.query(DoctorPatient).filter(
             DoctorPatient.patient_id == patient_id,
             DoctorPatient.status == "onaylandı"
         ).all()
-        
-        # Her doktora bildirim gönder
+
         for link in doctor_links:
             notify(
                 db=db,
                 user_id=link.doctor_id,
                 event="blood_pressure_completed",
                 title="Tansiyon Takibi Tamamlandı",
-                body=f"Hastanız günlük tansiyon takibini tamamladı.",
+                body="Hastanız günlük tansiyon takibini tamamladı.",
                 metadata={"tracking_id": tracking.id, "patient_id": patient_id}
             )
-    
+
+        # Aktif asistanlara bildirim
+        try:
+            from app.models.assistant_patient_permission import AssistantPatientPermission
+            assistants = db.query(AssistantPatientPermission).filter(
+                AssistantPatientPermission.patient_id == patient_id,
+                AssistantPatientPermission.status == "active"
+            ).all()
+            for ap in assistants:
+                notify(
+                    db=db,
+                    user_id=ap.assistant_id,
+                    event="blood_pressure_completed",
+                    title="Hasta Tansiyon Tamamladı",
+                    body="Takip ettiğiniz hasta günlük tansiyon takibini tamamladı.",
+                    metadata={"tracking_id": tracking.id, "patient_id": patient_id}
+                )
+        except Exception:
+            pass
+
     return tracking
 
 

@@ -1,25 +1,15 @@
-// components/doctors/PatientDoctors.tsx
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
 import {
-  Box,
-  Paper,
-  Typography,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  MenuItem,
-  TextField,
-  Stack,
-  Chip,
-  CircularProgress,
-  List,
-  ListItem,
+  Box, Card, Typography, Button, Dialog, DialogTitle,
+  DialogContent, DialogActions, MenuItem, TextField,
+  Stack, Chip, CircularProgress, InputAdornment,
 } from "@mui/material";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
+import SearchIcon from "@mui/icons-material/Search";
+import AddIcon from "@mui/icons-material/Add";
+import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import { getDoctors, requestDoctor, getMyDoctors, deleteDoctor } from "../../services/PatientApi";
 import { User } from "../../types/Staff";
 import ChatWindow from "@/components/message/ChatWindow";
@@ -30,65 +20,54 @@ interface MyDoctor extends User {
 }
 
 interface PatientDoctorsProps {
-  openDoctorId?: number | undefined; // Bildirimden modal açmak için optional
+  openDoctorId?: number;
 }
 
-const PatientDoctors: React.FC<PatientDoctorsProps> = ({ openDoctorId }) => {
-  const [allDoctors, setAllDoctors] = useState<User[]>([]);
-  const [myDoctors, setMyDoctors] = useState<MyDoctor[]>([]);
-  const [open, setOpen] = useState(false);
-  const [selectedDoctor, setSelectedDoctor] = useState<number | "">("");
-  const [loading, setLoading] = useState(false);
-  const [filterValue, setFilterValue] = useState("");
-  const [filterBy, setFilterBy] = useState<"name" | "email" | "status">("name");
-  const [chatOpen, setChatOpen] = useState(false);
-  const [currentDoctor, setCurrentDoctor] = useState<MyDoctor | null>(null);
-  const [patientId, setPatientId] = useState<number>(0);
-  const primaryColor = "#0a2d57";
+const statusConfig = {
+  onaylandı:  { label: "Onaylı",    bgcolor: "#e8f5e9", color: "#2e7d32" },
+  reddedildi: { label: "Reddedildi", bgcolor: "#ffebee", color: "#c62828" },
+  bekliyor:   { label: "Bekliyor",   bgcolor: "#fff3e0", color: "#e65100" },
+};
 
-  // localStorage'dan hasta ID'sini al
+const PatientDoctors: React.FC<PatientDoctorsProps> = ({ openDoctorId }) => {
+  const [allDoctors, setAllDoctors]       = useState<User[]>([]);
+  const [myDoctors, setMyDoctors]         = useState<MyDoctor[]>([]);
+  const [open, setOpen]                   = useState(false);
+  const [selectedDoctor, setSelectedDoctor] = useState<number | "">("");
+  const [loading, setLoading]             = useState(false);
+  const [search, setSearch]               = useState("");
+  const [chatOpen, setChatOpen]           = useState(false);
+  const [currentDoctor, setCurrentDoctor] = useState<MyDoctor | null>(null);
+  const [patientId, setPatientId]         = useState<number>(0);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        try {
-          const userObj = JSON.parse(userStr);
-          setPatientId(Number(userObj.id) || 0);
-        } catch (err) {
-          console.error("user parse hatası:", err);
-        }
-      }
+      try {
+        const u = JSON.parse(localStorage.getItem("user") || "{}");
+        setPatientId(Number(u.id) || 0);
+      } catch { /* ignore */ }
     }
   }, []);
 
   const fetchData = async () => {
     try {
-      const doctors = await getDoctors();
+      const [doctors, myDocs] = await Promise.all([getDoctors(), getMyDoctors()]);
       setAllDoctors(doctors || []);
-      const myDocs = await getMyDoctors();
       setMyDoctors(myDocs || []);
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  // Bildirimden gelen openDoctorId ile modal açma
   useEffect(() => {
     if (openDoctorId && myDoctors.length > 0) {
       const doctor = myDoctors.find((d) => d.id === openDoctorId);
-      if (doctor) handleMessageDoctor(doctor);
+      if (doctor) { setCurrentDoctor(doctor); setChatOpen(true); }
     }
   }, [openDoctorId, myDoctors]);
 
   const handleRequestDoctor = async () => {
-    if (!selectedDoctor || typeof selectedDoctor !== "number") {
-      alert("Lütfen bir doktor seçin.");
-      return;
-    }
+    if (!selectedDoctor || typeof selectedDoctor !== "number") return;
     setLoading(true);
     try {
       await requestDoctor({ doctor_id: selectedDoctor, note: "" });
@@ -104,66 +83,49 @@ const PatientDoctors: React.FC<PatientDoctorsProps> = ({ openDoctorId }) => {
 
   const handleDeleteDoctor = async (id: number) => {
     if (!window.confirm("Bu doktoru kaldırmak istiyor musunuz?")) return;
-    try {
-      await deleteDoctor(id);
-      await fetchData();
-    } catch (err) {
-      console.error(err);
-    }
+    try { await deleteDoctor(id); await fetchData(); }
+    catch (err) { console.error(err); }
   };
 
-  const handleMessageDoctor = (doctor: MyDoctor) => {
-    setCurrentDoctor(doctor);
-    setChatOpen(true);
-  };
+  const filteredRows = useMemo(() =>
+    myDoctors
+      .filter((doc) => !search ||
+        doc.name?.toLowerCase().includes(search.toLowerCase()) ||
+        doc.email?.toLowerCase().includes(search.toLowerCase())
+      )
+      .map((doc) => ({ id: doc.id, name: doc.name || "—", email: doc.email || "—", status: doc.status })),
+    [search, myDoctors]
+  );
 
   const columns: GridColDef[] = [
-    { field: "name", headerName: "Ad Soyad", flex: 1 },
-    { field: "email", headerName: "E-posta", flex: 1 },
+    { field: "name",  headerName: "Ad Soyad", flex: 1.2, minWidth: 140 },
+    { field: "email", headerName: "E-posta",  flex: 1.5, minWidth: 160 },
     {
-      field: "status",
-      headerName: "Durum",
-      flex: 0.7,
-      renderCell: (params) => {
-        const value = params.value as MyDoctor["status"];
-        const color =
-          value === "onaylandı"
-            ? "success"
-            : value === "reddedildi"
-            ? "error"
-            : "warning";
-        const label =
-          value === "onaylandı"
-            ? "Onaylı"
-            : value === "reddedildi"
-            ? "Reddedildi"
-            : "Bekliyor";
-        return <Chip label={label} color={color} variant="outlined" />;
+      field: "status", headerName: "Durum", flex: 0.8, minWidth: 110,
+      renderCell: (p) => {
+        const cfg = statusConfig[p.value as keyof typeof statusConfig] ?? statusConfig.bekliyor;
+        return <Chip label={cfg.label} size="small" sx={{ bgcolor: cfg.bgcolor, color: cfg.color, fontWeight: 600 }} />;
       },
     },
     {
-      field: "actions",
-      headerName: "İşlem",
-      flex: 0.7,
-      renderCell: (params) => (
+      field: "actions", headerName: "İşlemler", flex: 1, minWidth: 160, sortable: false,
+      renderCell: (p) => (
         <Stack direction="row" spacing={1}>
           <Button
-            color="error"
-            variant="outlined"
-            size="small"
-            onClick={() => handleDeleteDoctor(params.row.id)}
+            variant="outlined" size="small" color="error"
+            onClick={() => handleDeleteDoctor(p.row.id)}
+            sx={{ fontSize: 12 }}
           >
-            Sil
+            Kaldır
           </Button>
           <Button
-            color="primary"
-            variant="outlined"
-            size="small"
-            onClick={() =>
-              handleMessageDoctor(
-                myDoctors.find((d) => d.id === params.row.id)!
-              )
-            }
+            variant="outlined" size="small"
+            onClick={() => {
+              const doc = myDoctors.find((d) => d.id === p.row.id);
+              if (doc) { setCurrentDoctor(doc); setChatOpen(true); }
+            }}
+            sx={{ borderColor: "#0a2d57", color: "#0a2d57", fontSize: 12,
+              "&:hover": { bgcolor: "#e3f0ff" } }}
           >
             Mesaj
           </Button>
@@ -172,127 +134,112 @@ const PatientDoctors: React.FC<PatientDoctorsProps> = ({ openDoctorId }) => {
     },
   ];
 
-  const filteredRows = useMemo(() => {
-    return myDoctors
-      .filter((doc) => {
-        if (!filterValue) return true;
-        const val = filterValue.toLowerCase();
-        if (filterBy === "name") return doc.name?.toLowerCase().includes(val);
-        if (filterBy === "email") return doc.email?.toLowerCase().includes(val);
-        if (filterBy === "status") return doc.status?.toLowerCase().includes(val);
-        return true;
-      })
-      .map((doc) => ({
-        id: doc.id,
-        name: doc.name || "İsim yok",
-        email: doc.email || "Email yok",
-        status: doc.status,
-      }));
-  }, [filterValue, filterBy, myDoctors]);
-
-  if (!allDoctors.length) return <CircularProgress />;
+  if (!allDoctors.length && !myDoctors.length) {
+    return <Box sx={{ display: "flex", justifyContent: "center", pt: 8 }}><CircularProgress /></Box>;
+  }
 
   return (
-    <Box sx={{ p: 4, bgcolor: "#e6f0ff", minHeight: "90vh" }}>
-      <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h6" sx={{ color: primaryColor, fontWeight: "bold" }}>
-            Doktorlarım
+    <Box sx={{ maxWidth: 1100, mx: "auto" }}>
+      {/* Başlık */}
+      <Box sx={{ mb: 3, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <Box>
+          <Typography variant="h5" fontWeight={700} color="#0a2d57">Doktorlarım</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Bağlı olduğunuz doktorlar ve talep durumları
           </Typography>
-          <Button
-            variant="contained"
-            onClick={() => setOpen(true)}
-            sx={{ bgcolor: primaryColor, "&:hover": { bgcolor: "#082147" } }}
-          >
-            Yeni Doktor Talebi
-          </Button>
-        </Stack>
+        </Box>
+        <Button
+          variant="contained" startIcon={<AddIcon />}
+          onClick={() => setOpen(true)}
+          sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#071d3c" }, borderRadius: 2 }}
+        >
+          Yeni Doktor Talebi
+        </Button>
+      </Box>
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mb={2} alignItems="center">
-          <TextField
-            select
-            label="Filtreleme Türü"
-            value={filterBy}
-            onChange={(e) => setFilterBy(e.target.value as "name" | "email" | "status")}
-            size="small"
-            sx={{ width: "auto", minWidth: 140 }}
-          >
-            <MenuItem value="name">İsim</MenuItem>
-            <MenuItem value="email">Email</MenuItem>
-            <MenuItem value="status">Durum</MenuItem>
-          </TextField>
-          <TextField
-            label="Ara"
-            value={filterValue}
-            onChange={(e) => setFilterValue(e.target.value)}
-            fullWidth
-            size="small"
-            sx={{ flexGrow: 1 }}
-          />
-        </Stack>
+      {/* Filtre */}
+      <Card elevation={0} sx={{ border: "1px solid #e8edf5", borderRadius: 2, p: 2, mb: 2 }}>
+        <TextField
+          size="small" fullWidth placeholder="Doktor adı veya e-posta ile ara..."
+          value={search} onChange={(e) => setSearch(e.target.value)}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "#9aa5b4" }} />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+      </Card>
 
-        <div style={{ height: 450, width: "100%" }}>
-          <DataGrid
-            rows={filteredRows}
-            columns={columns}
-            getRowId={(row) => row.id}
-            disableRowSelectionOnClick
-            pageSizeOptions={[5, 10]}
-          />
-        </div>
-      </Paper>
+      {/* Tablo */}
+      <Card elevation={0} sx={{ border: "1px solid #e8edf5", borderRadius: 2 }}>
+        <DataGrid
+          rows={filteredRows}
+          columns={columns}
+          getRowId={(row) => row.id}
+          pageSizeOptions={[10, 25]}
+          disableRowSelectionOnClick
+          sx={{
+            border: "none",
+            "& .MuiDataGrid-columnHeaders": { bgcolor: "#f8faff", color: "#0a2d57", fontWeight: 700 },
+            "& .MuiDataGrid-row:hover": { bgcolor: "#f0f6ff" },
+            "& .MuiDataGrid-cell": { borderColor: "#f0f4fa" },
+          }}
+        />
+      </Card>
 
-      {/* Yeni Doktor Talebi Dialog */}
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Yeni Doktor Talebi</DialogTitle>
-        <DialogContent>
+      {/* Yeni Doktor Talebi */}
+      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm"
+        slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, borderBottom: "1px solid #e8edf5" }}>
+          <LocalHospitalIcon sx={{ color: "#0a2d57" }} />
+          <Typography fontWeight={700} color="#0a2d57">Yeni Doktor Talebi</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
           <TextField
-            select
-            label="Doktor Seç"
-            value={selectedDoctor}
+            select label="Doktor Seç" value={selectedDoctor} fullWidth
             onChange={(e) => setSelectedDoctor(Number(e.target.value))}
-            fullWidth
-            sx={{ mt: 2 }}
           >
             {allDoctors.map((doc) => (
               <MenuItem key={doc.id} value={doc.id}>
-                {doc.name} ({doc.email})
+                {doc.name} — {doc.email}
               </MenuItem>
             ))}
           </TextField>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>İptal</Button>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setOpen(false)} sx={{ color: "#6b7a90" }}>İptal</Button>
           <Button
-            onClick={handleRequestDoctor}
-            variant="contained"
+            onClick={handleRequestDoctor} variant="contained"
             disabled={!selectedDoctor || loading}
-            sx={{ bgcolor: primaryColor, "&:hover": { bgcolor: "#082147" } }}
+            sx={{ bgcolor: "#0a2d57", "&:hover": { bgcolor: "#071d3c" } }}
           >
             {loading ? "Gönderiliyor..." : "Talep Gönder"}
           </Button>
         </DialogActions>
       </Dialog>
 
-     {/* Mesajlaşma Dialog */}
-<Dialog open={chatOpen} onClose={() => setChatOpen(false)} fullWidth maxWidth="sm">
-  <DialogTitle>{currentDoctor?.name} ile Mesajlaşma</DialogTitle>
-
-  <DialogContent>
-    {currentDoctor && (
-      <ChatWindow
-        room={`chat_${Math.min(patientId, currentDoctor.id)}_${Math.max(patientId, currentDoctor.id)}`}
-        senderId={patientId}
-        receiverId={currentDoctor.id}
-        role="patient"
-      />
-    )}
-  </DialogContent>
-
-  <DialogActions>
-    <Button onClick={() => setChatOpen(false)}>Kapat</Button>
-  </DialogActions>
-</Dialog>
+      {/* Mesajlaşma */}
+      <Dialog open={chatOpen} onClose={() => setChatOpen(false)} fullWidth maxWidth="sm"
+        slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
+        <DialogTitle sx={{ borderBottom: "1px solid #e8edf5" }}>
+          <Typography fontWeight={700} color="#0a2d57">{currentDoctor?.name} ile Mesajlaşma</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          {currentDoctor && (
+            <ChatWindow
+              room={`chat_${Math.min(patientId, currentDoctor.id)}_${Math.max(patientId, currentDoctor.id)}`}
+              senderId={patientId} receiverId={currentDoctor.id} role="patient"
+            />
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setChatOpen(false)} sx={{ color: "#6b7a90" }}>Kapat</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

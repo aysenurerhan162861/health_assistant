@@ -1,17 +1,15 @@
-// components/forms/DoctorForm.tsx
 import React, { useState, useEffect } from "react";
 import {
-  Box,
-  Paper,
-  Typography,
-  Avatar,
-  Alert,
-  TextField,
-  Button,
-  Divider,
-  Stack,
-  Snackbar,
+  Box, TextField, Button, Card, CardContent,
+  Typography, Avatar, Stack, Divider, Grid,
+  Chip, Snackbar, Alert,
 } from "@mui/material";
+import PersonIcon from "@mui/icons-material/Person";
+import EmailIcon from "@mui/icons-material/Email";
+import BusinessIcon from "@mui/icons-material/Business";
+import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
+import WorkIcon from "@mui/icons-material/Work";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import { User, updateUser } from "../../services/api";
 
@@ -20,220 +18,221 @@ interface Props {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
+function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, py: 0.9 }}>
+      <Box sx={{ color: "#1976d2", display: "flex", mt: 0.2, flexShrink: 0 }}>{icon}</Box>
+      <Box>
+        <Typography variant="caption" color="text.secondary" display="block" lineHeight={1.2}>
+          {label}
+        </Typography>
+        <Typography variant="body2" fontWeight={500} color="#0a2d57">
+          {value || "—"}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
 const DoctorForm: React.FC<Props> = ({ user, setUser }) => {
-  const [doctor, setDoctor] = useState({
-    name: "",
-    email: "",
-    branch: "",
-    experience: 0,
-    institution: "",
-    diplomaNo: "",
-    about: "",
-    photoUrl: "",
+  const [formData, setFormData] = useState({
+    name: "", email: "", branch: "",
+    experience: 0, institution: "", diplomaNo: "", about: "", photoUrl: "",
   });
-
-  const [message, setMessage] = useState("");
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-
-  const primaryColor = "#0a2d57";
-  const lightBg = "#f8faff";
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
+    open: false, message: "", severity: "success",
+  });
 
   useEffect(() => {
     if (!user) return;
-
-    setDoctor({
-      name: user.name || "",
-      email: user.email || "",
-      branch: user.branch || "",
-      experience: user.experience ?? 0,
+    setFormData({
+      name:        user.name        || "",
+      email:       user.email       || "",
+      branch:      user.branch      || "",
+      experience:  user.experience  ?? 0,
       institution: user.institution || "",
-      diplomaNo: user.diploma_no || "",
-      about: user.about || "",
-      photoUrl: user.photoUrl || "",
+      diplomaNo:   user.diploma_no  || "",
+      about:       user.about       || "",
+      photoUrl:    user.photoUrl    || "",
     });
   }, [user]);
 
-  const handleChange = (field: string, value: any) =>
-    setDoctor((prev) => ({ ...prev, [field]: value }));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setFormData({ ...formData, photoUrl: URL.createObjectURL(file) });
+  };
 
   const handleSave = async () => {
     try {
-      if (!user.id) return;
-      const res = await updateUser({ id: user.id, ...doctor });
-      if (res.user) setUser(res.user);
-      setMessage("Bilgiler başarıyla güncellendi! ✅");
-      setSnackbarOpen(true);
+      const res = await updateUser({ id: user.id, ...formData });
+      if (res.error) throw new Error(res.error);
+      // API direkt user objesi döndürür, {user:...} sarmalı yok;
+      // güvenli yol: mevcut user + formData birleştir
+      const updatedUser: User = {
+        ...user,
+        name:        formData.name,
+        email:       formData.email,
+        branch:      formData.branch,
+        experience:  Number(formData.experience),
+        institution: formData.institution,
+        diploma_no:  formData.diplomaNo,
+        about:       formData.about,
+        photoUrl:    formData.photoUrl,
+      };
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setSnackbar({ open: true, message: "Bilgiler başarıyla güncellendi.", severity: "success" });
     } catch {
-      setMessage("Bilgiler güncellenirken bir hata oluştu ❌");
-      setSnackbarOpen(true);
+      setSnackbar({ open: true, message: "Güncelleme başarısız oldu.", severity: "error" });
     }
   };
 
   return (
-    <Box
-      sx={{
-        bgcolor: lightBg,
-        minHeight: "100vh",
-        pt: { xs: 4, md: 10 }, // ✅ navbar’a göre yukarıdan boşluk
-        pb: 6,
-        px: { xs: 2, md: 6 },
-      }}
-    >
-      {/* Sayfa Başlığı */}
-      <Typography
-        variant="h5"
-        sx={{
-          color: primaryColor,
-          fontWeight: "bold",
-          mb: 4,
-          ml: 1,
-        }}
-      >
-        Kişisel Bilgiler
-      </Typography>
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h5" fontWeight={700} color="#0a2d57">Kişisel Bilgiler</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Bilgilerinizi görüntüleyip güncelleyebilirsiniz.
+        </Typography>
+      </Box>
 
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={4}
-        alignItems="flex-start"
-      >
-        {/* Sol: Doktor Kartı */}
-        <Paper
-          elevation={4}
-          sx={{
-            p: 4,
-            borderRadius: 4,
-            flex: { xs: "1 1 100%", md: "0 0 30%" },
-            textAlign: "center",
-            bgcolor: "#fff",
-          }}
+      <Stack direction={{ xs: "column", md: "row" }} spacing={3} alignItems="flex-start">
+
+        {/* ── Sol: Profil Kartı ─────────────────────────────────────────── */}
+        <Card
+          elevation={0}
+          sx={{ width: { xs: "100%", md: 270 }, flexShrink: 0, border: "1px solid #e8edf5", borderRadius: 3 }}
         >
-          <Avatar
-            src={doctor.photoUrl}
-            sx={{
-              width: 130,
-              height: 130,
-              mx: "auto",
-              mb: 2,
-              border: `3px solid ${primaryColor}`,
-            }}
-          />
-          <Typography
-            variant="h6"
-            sx={{ color: primaryColor, fontWeight: 700 }}
-          >
-            {doctor.name || "Ad Soyad"}
-          </Typography>
-          <Typography
-            variant="body2"
-            color="textSecondary"
-            sx={{ mb: 2, fontStyle: "italic" }}
-          >
-            {doctor.branch || "Branş bilgisi yok"}
-          </Typography>
-          <Button
-            variant="contained"
-            fullWidth
-            startIcon={<UploadFileIcon />}
-            sx={{
-              bgcolor: primaryColor,
-              color: "#fff",
-              fontWeight: "bold",
-              "&:hover": { bgcolor: "#071d3c" },
-            }}
-          >
-            Fotoğraf Yükle
-          </Button>
-          <Divider sx={{ my: 3 }} />
-          <Typography
-            variant="subtitle2"
-            sx={{ color: primaryColor, fontWeight: 600 }}
-          >
-            {doctor.institution || "Kurumu Belirtilmemiş"}
-          </Typography>
-        </Paper>
+          <Box sx={{ textAlign: "center", px: 3, pt: 4, pb: 2 }}>
+            <Avatar
+              src={user.photoUrl || ""}
+              sx={{ width: 90, height: 90, mx: "auto", mb: 1.5, border: "3px solid #1976d2" }}
+            />
+            <Typography variant="h6" fontWeight={700} color="#0a2d57" noWrap>
+              {user.name || "Ad Soyad"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" noWrap sx={{ mb: 1 }}>
+              {user.email}
+            </Typography>
+            <Chip
+              label="Doktor"
+              size="small"
+              sx={{ bgcolor: "#e3f0ff", color: "#1565c0", fontWeight: 600, fontSize: 12 }}
+            />
+          </Box>
 
-        {/* Sağ: Güncelleme Formu */}
-        <Box sx={{ flex: { xs: "1", md: "0 0 70%" } }}>
-          <Paper sx={{ p: 4, borderRadius: 4 }} elevation={4}>
-            <Typography
-              variant="h6"
-              sx={{
-                color: primaryColor,
-                fontWeight: "bold",
-                mb: 3,
-              }}
+          <Divider />
+          <CardContent sx={{ px: 2.5, py: 1.5 }}>
+            <InfoRow icon={<MedicalServicesIcon fontSize="small" />} label="Branş"       value={user.branch      || ""} />
+            <InfoRow icon={<BusinessIcon fontSize="small" />}        label="Kurum"        value={user.institution || ""} />
+            <InfoRow icon={<WorkIcon fontSize="small" />}            label="Deneyim"      value={user.experience ? `${user.experience} yıl` : ""} />
+          </CardContent>
+
+          <Divider />
+          <Box sx={{ p: 2 }}>
+            <Button
+              variant="outlined"
+              component="label"
+              fullWidth
+              size="small"
+              startIcon={<PhotoCameraIcon />}
+              sx={{ borderColor: "#1976d2", color: "#1976d2" }}
+            >
+              Fotoğraf Değiştir
+              <input hidden accept="image/*" type="file" onChange={handleImageChange} />
+            </Button>
+          </Box>
+        </Card>
+
+        {/* ── Sağ: Güncelleme Formu ──────────────────────────────────────── */}
+        <Card
+          elevation={0}
+          sx={{ flex: 1, border: "1px solid #e8edf5", borderRadius: 3 }}
+        >
+          <CardContent sx={{ p: 3 }}>
+
+            {/* Kişisel */}
+            <Typography variant="subtitle1" fontWeight={600} color="#0a2d57" mb={2}>
+              Kişisel Bilgiler
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth label="Ad Soyad" name="name"
+                  value={formData.name} onChange={handleChange}
+                  slotProps={{ input: { startAdornment: <PersonIcon fontSize="small" sx={{ mr: 1, color: "#9aa5b4" }} /> } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth label="E-posta" name="email"
+                  value={formData.email} onChange={handleChange}
+                  slotProps={{ input: { startAdornment: <EmailIcon fontSize="small" sx={{ mr: 1, color: "#9aa5b4" }} /> } }}
+                />
+              </Grid>
+            </Grid>
+
+            <Divider sx={{ my: 3 }} />
+
+            {/* Mesleki */}
+            <Typography variant="subtitle1" fontWeight={600} color="#0a2d57" mb={2}>
+              Mesleki Bilgiler
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth label="Branş" name="branch"
+                  value={formData.branch} onChange={handleChange}
+                  slotProps={{ input: { startAdornment: <MedicalServicesIcon fontSize="small" sx={{ mr: 1, color: "#9aa5b4" }} /> } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth label="Deneyim (yıl)" name="experience" type="number"
+                  value={formData.experience} onChange={handleChange}
+                  slotProps={{ input: { startAdornment: <WorkIcon fontSize="small" sx={{ mr: 1, color: "#9aa5b4" }} /> } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth label="Çalıştığı Kurum" name="institution"
+                  value={formData.institution} onChange={handleChange}
+                  slotProps={{ input: { startAdornment: <BusinessIcon fontSize="small" sx={{ mr: 1, color: "#9aa5b4" }} /> } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth label="Diploma No" name="diplomaNo"
+                  value={formData.diplomaNo} onChange={handleChange}
+                  slotProps={{ input: { startAdornment: <UploadFileIcon fontSize="small" sx={{ mr: 1, color: "#9aa5b4" }} /> } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField fullWidth label="Hakkında" name="about"
+                  value={formData.about} onChange={handleChange}
+                  multiline minRows={3}
+                />
+              </Grid>
+            </Grid>
+
+            <Button
+              variant="contained"
+              fullWidth
+              onClick={handleSave}
+              sx={{ mt: 4, py: 1.3, bgcolor: "#0a2d57", borderRadius: 2, fontWeight: 600,
+                "&:hover": { bgcolor: "#071d3c" } }}
             >
               Bilgileri Güncelle
-            </Typography>
-            <Stack spacing={2}>
-              <TextField
-                label="Ad Soyad"
-                value={doctor.name}
-                onChange={(e) => handleChange("name", e.target.value)}
-                fullWidth
-              />
-              <TextField
-                label="E-posta"
-                value={doctor.email}
-                onChange={(e) => handleChange("email", e.target.value)}
-                fullWidth
-              />
-              <TextField
-                label="Branş"
-                value={doctor.branch}
-                onChange={(e) => handleChange("branch", e.target.value)}
-                fullWidth
-              />
-              <TextField
-                label="Deneyim (yıl)"
-                type="number"
-                value={doctor.experience}
-                onChange={(e) =>
-                  handleChange("experience", Number(e.target.value))
-                }
-                fullWidth
-              />
-              <TextField
-                label="Çalıştığı Kurum"
-                value={doctor.institution}
-                onChange={(e) => handleChange("institution", e.target.value)}
-                fullWidth
-              />
-              <TextField
-                label="Diploma No"
-                value={doctor.diplomaNo}
-                onChange={(e) => handleChange("diplomaNo", e.target.value)}
-                fullWidth
-              />
-              <TextField
-                label="Hakkında"
-                value={doctor.about}
-                onChange={(e) => handleChange("about", e.target.value)}
-                multiline
-                minRows={3}
-                fullWidth
-              />
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleSave}
-                sx={{ fontWeight: "bold" }}
-              >
-                Kaydet
-              </Button>
-            </Stack>
-          </Paper>
-        </Box>
+            </Button>
+          </CardContent>
+        </Card>
       </Stack>
 
       <Snackbar
-        open={snackbarOpen}
+        open={snackbar.open}
         autoHideDuration={4000}
-        onClose={() => setSnackbarOpen(false)}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert severity="info" sx={{ width: "100%" }}>
-          {message}
+        <Alert severity={snackbar.severity} sx={{ width: "100%" }} onClose={() => setSnackbar((s) => ({ ...s, open: false }))}>
+          {snackbar.message}
         </Alert>
       </Snackbar>
     </Box>

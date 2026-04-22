@@ -35,7 +35,7 @@ const AssistantLabsPage: React.FC = () => {
   return (
     <Layout>
       <Box sx={{ p: 2, mt: 2 }}>
-        <Typography variant="h5" sx={{ mb: 1, fontWeight: 600 }}>Tahlil Sonuçları</Typography>
+        <Typography variant="h5" sx={{ mb: 1, fontWeight: 600 }}></Typography>
         {labReports.length === 0 ? (
           <Alert severity="info" sx={{ mt: 2 }}>
             Tahlil görüntüleme izniniz bulunmuyor veya henüz tahlil yok.

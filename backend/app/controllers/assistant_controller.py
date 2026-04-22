@@ -26,7 +26,38 @@ def get_current_user_id(
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
     return user.id
 
+
+def get_current_user(
+    token_header: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> User:
+    if not token_header:
+        raise HTTPException(status_code=401, detail="Token gerekli.")
+    token = token_header.replace("Bearer ", "")
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Geçersiz token.")
+    email = payload.get("sub")
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı.")
+    return user
+
+
  #── Asistan veri endpoint'leri ───────────────────────────────────────
+
+@router.get("/me/doctor")
+def get_my_doctor(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Asistanın bağlı olduğu doktoru döner."""
+    if not current_user.parent_id:
+        raise HTTPException(status_code=404, detail="Bağlı doktor bulunamadı.")
+    doctor = db.query(User).filter(User.id == current_user.parent_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doktor bulunamadı.")
+    return {"doctor_id": doctor.id, "doctor_name": doctor.name}
 
 @router.get("/me/meals")
 def get_assistant_meals(
@@ -73,6 +104,22 @@ def grant_permission_to_assistant(
     permission = assistant_service.grant_permission(
         db, doctor_id, request.assistant_id, request.patient_id
     )
+
+    # 🔔 Asistana bildirim (sync notify)
+    try:
+        from app.services.notification_service import notify
+        doctor = db.query(User).filter(User.id == doctor_id).first()
+        doctor_name = doctor.name if doctor else f"Doktor #{doctor_id}"
+        notify(
+            db=db,
+            user_id=request.assistant_id,
+            event="assistant_patient_assigned",
+            title="Yeni Hasta Erişimi",
+            body=f"{doctor_name} size hasta #{request.patient_id} için erişim izni verdi."
+        )
+    except Exception:
+        pass  # Bildirim başarısız olsa bile akışı bozma
+
     return {"message": "Hasta asistana başarıyla atandı", "permission": permission}
 
 
@@ -113,6 +160,29 @@ def update_assistant_permission(
         can_view_labs=request.get("can_view_labs"),
         can_view_mr=request.get("can_view_mr"),
     )
+
+    # 🔔 Asistana erişim yetkisi güncellemesi bildirimi
+    try:
+        from app.services.notification_service import notify
+        doctor = db.query(User).filter(User.id == doctor_id).first()
+        doctor_name = doctor.name if doctor else f"Doktor #{doctor_id}"
+        patient_id = request["patient_id"]
+        parts = []
+        if request.get("can_view_labs") is not None:
+            parts.append("tahlil" if request["can_view_labs"] else "tahlil erişimi kaldırıldı")
+        if request.get("can_view_mr") is not None:
+            parts.append("MR" if request["can_view_mr"] else "MR erişimi kaldırıldı")
+        detail = ", ".join(parts) if parts else "erişim izni"
+        notify(
+            db=db,
+            user_id=request["assistant_id"],
+            event="assistant_patient_assigned",
+            title="Erişim İzni Güncellendi",
+            body=f"{doctor_name} hasta #{patient_id} için {detail} izninizi güncelledi."
+        )
+    except Exception:
+        pass
+
     return {"message": "İzinler güncellendi", "permission": result}
 
 
