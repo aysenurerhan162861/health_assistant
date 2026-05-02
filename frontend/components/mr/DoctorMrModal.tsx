@@ -40,10 +40,18 @@ const STATUS_MAP: Record<string, StatusCfg> = {
 const STATUS_FALLBACK: StatusCfg = { label: "Bilinmiyor", bgcolor: "#f3f4f6", color: "#555" };
 const getStatusCfg = (s: string): StatusCfg => STATUS_MAP[s] ?? STATUS_FALLBACK;
 
+const isSuspicious = (scan: MrScan): boolean => {
+  if (scan.lesion_detected) return false;
+  const volume = scan.lesion_volume ?? 0;
+  return volume > 0 && volume < 200;
+};
+
 const getBorderColor = (scan: MrScan): string => {
   if (scan.status === "pending") return "#e65100";
   if (scan.status === "error")   return "#c62828";
-  return scan.lesion_detected    ? "#f57c00" : "#2e7d32";
+  if (scan.lesion_detected)      return "#c62828";  // kırmızı
+  if (isSuspicious(scan))        return "#f57c00";  // turuncu
+  return "#2e7d32";                                  // yeşil
 };
 
 /* ─── Tek tarama kartı ─── */
@@ -113,15 +121,16 @@ const MrScanDetailCard: React.FC<{
             sx={{ bgcolor: statusCfg.bgcolor, color: statusCfg.color, fontWeight: 600, fontSize: 11 }}
           />
           {scan.status === "done" && (
-            <Chip
-              label={scan.lesion_detected ? "⚠ Lezyon Var" : "✓ Normal"} size="small"
-              sx={{
-                bgcolor: scan.lesion_detected ? "#fff3e0" : "#e8f5e9",
-                color:   scan.lesion_detected ? "#e65100"  : "#2e7d32",
-                fontWeight: 600, fontSize: 11,
-              }}
-            />
-          )}
+  <Chip
+    label={scan.lesion_detected ? "⚠ Lezyon Var" : isSuspicious(scan) ? "⚡ Şüpheli" : "✓ Normal"}
+    size="small"
+    sx={{
+      bgcolor: scan.lesion_detected ? "#ffebee" : isSuspicious(scan) ? "#fff3e0" : "#e8f5e9",
+      color:   scan.lesion_detected ? "#c62828" : isSuspicious(scan) ? "#e65100" : "#2e7d32",
+      fontWeight: 600, fontSize: 11,
+    }}
+  />
+)}
           {userRole !== "assistant" && (
             <IconButton size="small" onClick={(e) => { e.stopPropagation(); setExpanded(true); setEditing(true); }}
               sx={{ color: "#9aa5b4" }}>
@@ -158,10 +167,10 @@ const MrScanDetailCard: React.FC<{
               <Stack direction="row" spacing={1.5} flexWrap="wrap" mb={2}>
                 <Box sx={{ p: 1.5, bgcolor: "#f8faff", border: "1px solid #e8edf5", borderRadius: 2, minWidth: 110 }}>
                   <Typography variant="caption" color="text.secondary">Lezyon</Typography>
-                  <Typography variant="body2" fontWeight={700}
-                    color={scan.lesion_detected ? "#e65100" : "#2e7d32"}>
-                    {scan.lesion_detected ? "Tespit Edildi" : "Yok"}
-                  </Typography>
+                 <Typography variant="body2" fontWeight={700}
+  color={scan.lesion_detected ? "#c62828" : isSuspicious(scan) ? "#e65100" : "#2e7d32"}>
+  {scan.lesion_detected ? "Tespit Edildi" : isSuspicious(scan) ? "Şüpheli" : "Yok"}
+</Typography>
                 </Box>
                 {scan.lesion_volume != null && (
                   <Box sx={{ p: 1.5, bgcolor: "#f8faff", border: "1px solid #e8edf5", borderRadius: 2, minWidth: 110 }}>
@@ -181,11 +190,18 @@ const MrScanDetailCard: React.FC<{
 
               {/* AI yorumu */}
               {scan.ai_comment && (
-                <Box sx={{ mb: 2, p: 2, bgcolor: "#e3f2fd", borderRadius: 2, borderLeft: "3px solid #1565c0" }}>
-                  <Stack direction="row" alignItems="center" spacing={0.75} mb={0.5}>
-                    <SmartToyIcon sx={{ fontSize: 15, color: "#1565c0" }} />
-                    <Typography variant="caption" fontWeight={700} color="#1565c0">AI Değerlendirmesi</Typography>
-                  </Stack>
+                <Box sx={{
+  mb: 2, p: 2, borderRadius: 2,
+  bgcolor: scan.lesion_detected ? "#ffebee" : isSuspicious(scan) ? "#fff3e0" : "#e3f2fd",
+  borderLeft: `3px solid ${scan.lesion_detected ? "#c62828" : isSuspicious(scan) ? "#e65100" : "#1565c0"}`,
+}}>
+  <Stack direction="row" alignItems="center" spacing={0.75} mb={0.5}>
+    <SmartToyIcon sx={{ fontSize: 15, color: scan.lesion_detected ? "#c62828" : isSuspicious(scan) ? "#e65100" : "#1565c0" }} />
+    <Typography variant="caption" fontWeight={700}
+      color={scan.lesion_detected ? "#c62828" : isSuspicious(scan) ? "#e65100" : "#1565c0"}>
+      AI Değerlendirmesi
+    </Typography>
+  </Stack>
                   <Typography variant="body2">{scan.ai_comment}</Typography>
                 </Box>
               )}

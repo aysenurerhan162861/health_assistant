@@ -9,3 +9,4 @@ from .blood_pressure_measurement import BloodPressureMeasurement
 from .chat_message import ChatMessage
 from .mr_scan import MrScan
 from .lab_test import LabTest 
+from .step_record import StepRecord

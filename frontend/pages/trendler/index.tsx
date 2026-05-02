@@ -16,7 +16,10 @@ import {
   CalendarToday as AgeIcon, Person as PersonIcon,
   TrendingUp as TrendingUpIcon,
 } from "@mui/icons-material";
+import DirectionsWalkIcon from "@mui/icons-material/DirectionsWalk";
 import { getApprovedPatients } from "@/services/PatientApi";
+import { getStepHistory } from "@/services/StepApi";
+import { StepRecord } from "@/types/StepRecord";
 import { User } from "@/types/Staff";
 import axios from "axios";
 
@@ -26,6 +29,7 @@ const TrendlerPage: React.FC = () => {
   const [patients, setPatients]           = useState<User[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
   const [loading, setLoading]             = useState(false);
+  const [stepRecords, setStepRecords]     = useState<StepRecord[]>([]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -40,6 +44,33 @@ const TrendlerPage: React.FC = () => {
       if (role === "assistant" || role === "asistan") fetchAssistantPatients(userObj.id);
     } catch { /* ignore */ }
   }, []);
+
+  useEffect(() => {
+    const fetchSteps = async () => {
+      try {
+        const userObj = JSON.parse(localStorage.getItem("user") || "{}");
+        const role = userObj.role?.toLowerCase();
+        if (role === "citizen") {
+          const steps = await getStepHistory(userObj.id, 30);
+          setStepRecords(steps);
+        }
+      } catch {}
+    };
+    if (!selectedPatientId) fetchSteps();
+  }, []);
+
+  useEffect(() => {
+    const fetchPatientSteps = async () => {
+      if (!selectedPatientId) { return; }
+      try {
+        const steps = await getStepHistory(selectedPatientId, 30);
+        setStepRecords(steps);
+      } catch {
+        setStepRecords([]);
+      }
+    };
+    fetchPatientSteps();
+  }, [selectedPatientId]);
 
   const fetchDoctorPatients = async () => {
     try {
@@ -323,6 +354,40 @@ const TrendlerPage: React.FC = () => {
             compact={false}
           />
         )}
+
+        {/* Adım Takibi Özeti — sadece hasta rolü */}
+        {stepRecords.length > 0 && (!showPatientSelect || selectedPatientId) && (
+          <Card elevation={0} sx={{ border: "1px solid #e8edf5", borderRadius: 2, p: 2.5, mt: 3 }}>
+            <Typography variant="subtitle1" fontWeight={700} color="#0a2d57" sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+              <DirectionsWalkIcon sx={{ color: "#00838f" }} />
+              Adım Takibi Özeti (Son 30 Gün)
+            </Typography>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2 }}>
+              <Box sx={{ textAlign: "center", p: 1.5, bgcolor: "#e0f7fa", borderRadius: 2 }}>
+                <Typography variant="caption" color="text.secondary">Günlük Ortalama</Typography>
+                <Typography variant="h5" fontWeight={700} color="#00838f">
+                  {Math.round(stepRecords.reduce((s, r) => s + r.steps, 0) / stepRecords.length).toLocaleString("tr-TR")}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">adım</Typography>
+              </Box>
+              <Box sx={{ textAlign: "center", p: 1.5, bgcolor: "#fff3e0", borderRadius: 2 }}>
+                <Typography variant="caption" color="text.secondary">En Yüksek</Typography>
+                <Typography variant="h5" fontWeight={700} color="#e65100">
+                  {Math.max(...stepRecords.map((r) => r.steps)).toLocaleString("tr-TR")}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">adım</Typography>
+              </Box>
+              <Box sx={{ textAlign: "center", p: 1.5, bgcolor: "#e8f5e9", borderRadius: 2 }}>
+                <Typography variant="caption" color="text.secondary">Toplam Mesafe</Typography>
+                <Typography variant="h5" fontWeight={700} color="#2e7d32">
+                  {stepRecords.reduce((s, r) => s + (r.distance_km || 0), 0).toFixed(1)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">km</Typography>
+              </Box>
+            </Box>
+          </Card>
+        )}
+
       </Box>
     </Layout>
   );

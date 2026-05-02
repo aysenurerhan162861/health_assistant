@@ -1,21 +1,18 @@
 {
-  "model_name": "AttentionUNet3D",
-  "dataset": "ISLES-2022 + OpenNeuro-ds000221",
-  "input_channels": 2,
-  "modalities": [
-    "dwi",
-    "adc"
-  ],
-  "target_shape": [
-    64,
-    64,
-    32
-  ],
-  "best_epoch": 79,
-  "val_dice": 0.6369218942044037,
-  "val_iou": 0.5140638646137502,
-  "threshold": 0.3,
-  "base_filters": 16,
-  "healthy_subjects": 30,
-  "isles_subjects": 250
+    "model_name": "ResUNet3D_DS_V4_PatchBased",
+    "model_version": "4.0",
+    "architecture": "ResUNet3D with Deep Supervision + SE Blocks",
+    "input_channels": 2,
+    "filters": [32, 64, 128, 256],
+    "dropout": 0.15,
+    "modalities": ["dwi", "adc"],
+    "patch_size": [96, 96, 32],
+    "sliding_window_overlap": 0.5,
+    "threshold": 0.5,
+    "preprocessing": "zscore",
+    "val_dice": 0.7426,
+    "val_hd95_mm": 6.2,
+    "training_data": "ISLES-2022 (250 subjects)",
+    "training_method": "patch-based, single run, 225 train + 25 val",
+    "note": "Orijinal çözünürlükte patch-based training, zoom yok"
 }

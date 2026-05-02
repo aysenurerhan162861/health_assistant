@@ -25,10 +25,48 @@ const STATUS_MAP: Record<string, StatusCfg> = {
 const STATUS_FALLBACK: StatusCfg = { label: "Bilinmiyor", bgcolor: "#f3f4f6", color: "#555" };
 const getStatusCfg = (s: string): StatusCfg => STATUS_MAP[s] ?? STATUS_FALLBACK;
 
+/* ── Şüpheli durum tespiti ── */
+const isSuspicious = (scan: MrScan): boolean => {
+  if (scan.lesion_detected) return false;
+
+  const volume = scan.lesion_volume ?? 0;
+
+  // düşük voxel → şüpheli
+  return volume > 0 && volume < 200;
+};
+
 const getBorderColor = (scan: MrScan): string => {
   if (scan.status === "pending") return "#e65100";
   if (scan.status === "error")   return "#c62828";
-  return scan.lesion_detected    ? "#f57c00" : "#2e7d32";
+
+  if (scan.lesion_detected) return "#c62828";   // 🔴 kırmızı
+  if (isSuspicious(scan))   return "#f9a825";   // 🟡 sarı
+
+  return "#2e7d32";                              // 🟢 yeşil
+};
+
+const getResultChip = (scan: MrScan) => {
+  if (scan.lesion_detected) {
+    return {
+      label: "⚠ Lezyon Var",
+      bgcolor: "#ffebee",
+      color: "#c62828"
+    };
+  }
+
+  if (isSuspicious(scan)) {
+    return {
+      label: "⚡ Şüpheli",
+      bgcolor: "#fff8e1",
+      color: "#f57f17"
+    };
+  }
+
+  return {
+    label: "✓ Normal",
+    bgcolor: "#e8f5e9",
+    color: "#2e7d32"
+  };
 };
 
 interface Props {
@@ -110,10 +148,12 @@ const MrScanList: React.FC<Props> = ({ scans }) => {
       <Stack spacing={2}>
         {filtered.map((scan) => {
           const statusCfg     = getStatusCfg(scan.status);
+          const resultChip    = getResultChip(scan);
           const confidencePct = scan.dice_confidence != null
             ? Math.round(scan.dice_confidence * 100)
             : null;
-          const isOpen = openId === scan.id;
+          const isOpen    = openId === scan.id;
+          const suspicious = isSuspicious(scan);
 
           return (
             <Box key={scan.id} sx={{
@@ -152,10 +192,10 @@ const MrScanList: React.FC<Props> = ({ scans }) => {
                   />
                   {scan.status === "done" && (
                     <Chip
-                      label={scan.lesion_detected ? "⚠ Lezyon Var" : "✓ Normal"} size="small"
+                      label={resultChip.label} size="small"
                       sx={{
-                        bgcolor: scan.lesion_detected ? "#fff3e0" : "#e8f5e9",
-                        color:   scan.lesion_detected ? "#e65100"  : "#2e7d32",
+                        bgcolor: resultChip.bgcolor,
+                        color:   resultChip.color,
                         fontWeight: 600, fontSize: 11,
                       }}
                     />
@@ -190,11 +230,13 @@ const MrScanList: React.FC<Props> = ({ scans }) => {
                     <>
                       {/* Metrikler */}
                       <Stack direction="row" spacing={1.5} flexWrap="wrap" mb={2}>
-                        <Box sx={{ p: 1.5, bgcolor: "#f8faff", border: "1px solid #e8edf5", borderRadius: 2, minWidth: 110 }}>
+                        <Box sx={{
+                          p: 1.5, bgcolor: "#f8faff", border: "1px solid #e8edf5", borderRadius: 2, minWidth: 110
+                        }}>
                           <Typography variant="caption" color="text.secondary">Lezyon</Typography>
                           <Typography variant="body2" fontWeight={700}
-                            color={scan.lesion_detected ? "#e65100" : "#2e7d32"}>
-                            {scan.lesion_detected ? "Tespit Edildi" : "Yok"}
+                            color={scan.lesion_detected ? "#e65100" : suspicious ? "#f57f17" : "#2e7d32"}>
+                            {scan.lesion_detected ? "Tespit Edildi" : suspicious ? "Şüpheli" : "Yok"}
                           </Typography>
                         </Box>
                         {scan.lesion_volume != null && (
@@ -215,10 +257,17 @@ const MrScanList: React.FC<Props> = ({ scans }) => {
 
                       {/* AI yorumu */}
                       {scan.ai_comment && (
-                        <Box sx={{ mb: 2, p: 2, bgcolor: "#e3f2fd", borderRadius: 2, borderLeft: "3px solid #1565c0" }}>
+                        <Box sx={{
+                          mb: 2, p: 2, borderRadius: 2,
+                          bgcolor: suspicious ? "#fff8e1" : "#e3f2fd",
+                          borderLeft: `3px solid ${suspicious ? "#f9a825" : "#1565c0"}`,
+                        }}>
                           <Stack direction="row" alignItems="center" spacing={0.75} mb={0.5}>
-                            <SmartToyIcon sx={{ fontSize: 15, color: "#1565c0" }} />
-                            <Typography variant="caption" fontWeight={700} color="#1565c0">AI Değerlendirmesi</Typography>
+                            <SmartToyIcon sx={{ fontSize: 15, color: suspicious ? "#f57f17" : "#1565c0" }} />
+                            <Typography variant="caption" fontWeight={700}
+                              color={suspicious ? "#f57f17" : "#1565c0"}>
+                              AI Değerlendirmesi
+                            </Typography>
                           </Stack>
                           <Typography variant="body2">{scan.ai_comment}</Typography>
                         </Box>

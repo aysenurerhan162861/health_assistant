@@ -1,333 +1,279 @@
+﻿"""
+backend/app/tasks/mr_tasks.py
+V6 — FIXED CLINICAL ResUNet3D + Robust Decision Engine
+
+✔ False positive azaltıldı
+✔ Healthy case stabil hale getirildi
+✔ Lesion selection improved (top-k + CC filtering)
+✔ Adaptive threshold gating
+✔ Voxel estimation stabilized
+✔ Küçük şüphe alanları için klinik uyarı (V6.1)
+"""
+
 import os
 import sys
 import json
 import numpy as np
 import nibabel as nib
 import torch
-import torch.nn.functional as F
-from scipy.ndimage import zoom
+
+from scipy.ndimage import label, binary_erosion, binary_fill_holes
 
 from app.celery_app import celery_app
 from app.database import SessionLocal
 
-# ML klasörünü path'e ekle
+
+# ─────────────────────────────
+# MODEL LOAD
+# ─────────────────────────────
 ML_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'ml')
 sys.path.insert(0, os.path.abspath(ML_DIR))
-from model import AttentionUNet3D
 
-# ── Model bilgilerini yükle ──────────────────────────────────────────
+from model import ResUNet3D_DS
+
 INFO_PATH = os.path.join(ML_DIR, 'model_info.json')
-CKPT_PATH = os.path.join(ML_DIR, 'att_unet_multimodal_best.pt')
+CKPT_PATH = os.path.join(ML_DIR, 'best_model.pt')
 
 with open(INFO_PATH) as f:
     MODEL_INFO = json.load(f)
 
-TARGET_SHAPE = tuple(MODEL_INFO['target_shape'])  # (64, 64, 32)
-THRESHOLD    = MODEL_INFO['threshold']             # 0.4
-MODALITIES   = MODEL_INFO['modalities']            # ['dwi', 'adc']
+PATCH_SIZE = tuple(MODEL_INFO['patch_size'])
+OVERLAP = MODEL_INFO.get('sliding_window_overlap', 0.5)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-_model = AttentionUNet3D(
-    in_ch=MODEL_INFO['input_channels'],  # 2
+
+_model = ResUNet3D_DS(
+    in_ch=MODEL_INFO['input_channels'],
     out_ch=1,
-    base=MODEL_INFO['base_filters']
+    filters=MODEL_INFO['filters'],
+    dropout=0.0
 ).to(device)
+
 _ckpt = torch.load(CKPT_PATH, map_location=device)
 _model.load_state_dict(_ckpt['model_state_dict'])
 _model.eval()
-print(f"[Celery Worker] Multimodal model yüklendi — Modaliteler: {MODALITIES} | Cihaz: {device}")
+
+print(f"[V6] Model loaded | Patch: {PATCH_SIZE} | Device: {device}")
 
 
-# ── Yardımcı fonksiyonlar ────────────────────────────────────────────
-def _normalize(img: np.ndarray) -> np.ndarray:
-    img = img.astype(np.float32)
-    mn, mx = img.min(), img.max()
-    return (img - mn) / (mx - mn + 1e-8)
-
-
-def _resize(vol: np.ndarray, target: tuple) -> np.ndarray:
-    factors = [t / s for t, s in zip(target, vol.shape)]
-    return zoom(vol, factors, order=1)
-
-
-def _skull_strip(file_path: str) -> np.ndarray:
-    """
-    HD-BET ile skull stripping uygula.
-    Başarısız olursa intensity threshold fallback kullanır.
-    """
-    try:
-        import tempfile, os
-        from hd_bet.run import run_hd_bet
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out_path = os.path.join(tmpdir, "stripped.nii.gz")
-            run_hd_bet(file_path, out_path, device="cuda" if torch.cuda.is_available() else "cpu",
-                       do_tta=False, keep_existing_brain_mask=False, overwrite_existing=True)
-            vol = nib.load(out_path).get_fdata()
-            print(f"[Task] HD-BET skull stripping tamamlandı")
-            return vol
-    except Exception as e:
-        print(f"[Task] HD-BET başarısız ({e}), threshold fallback kullanılıyor...")
-        from scipy.ndimage import binary_fill_holes, binary_erosion
-        vol = nib.load(file_path).get_fdata()
-        if vol.ndim == 4:
-            vol = vol[..., 0]
-        thresh = np.percentile(vol[vol > 0], 15) if vol.max() > 0 else 0
-        mask = binary_fill_holes(vol > thresh)
-        mask = binary_erosion(mask, iterations=2)
-        return vol * mask
-
-
-def _load_volume(file_path: str) -> np.ndarray:
-    """NIfTI yükle, skull strip, normalize et, hedef şekle getir."""
-    vol = _skull_strip(file_path)
+# ─────────────────────────────
+# PREPROCESSING
+# ─────────────────────────────
+def _load_volume(file_path):
+    vol = nib.load(file_path).get_fdata()
     if vol.ndim == 4:
         vol = vol[..., 0]
-    vol = _normalize(vol)
-    vol = _resize(vol, TARGET_SHAPE)
+
+    brain = vol[vol > 0]
+    if len(brain) == 0:
+        return vol.astype(np.float32)
+
+    p1, p99 = np.percentile(brain, [0.5, 99.5])
+    vol = np.clip(vol, p1, p99)
+
+    mean = brain.mean()
+    std = brain.std() + 1e-8
+    vol = (vol - mean) / std
+    vol = np.clip(vol, -3, 3)
+
     return vol.astype(np.float32)
 
 
-def _generate_comment(lesion_detected: bool, lesion_volume: float, confidence: float) -> str:
+# ─────────────────────────────
+# SLIDING WINDOW
+# ─────────────────────────────
+def sliding_window(dwi, adc):
+    pd, ph, pw = PATCH_SIZE
+    D, H, W = dwi.shape
+
+    stride_d = max(1, int(pd * (1 - OVERLAP)))
+    stride_h = max(1, int(ph * (1 - OVERLAP)))
+    stride_w = max(1, int(pw * (1 - OVERLAP)))
+
+    pred = np.zeros((D, H, W), np.float32)
+    count = np.zeros((D, H, W), np.float32)
+
+    with torch.no_grad():
+        for d in range(0, max(1, D - pd + 1), stride_d):
+            for h in range(0, max(1, H - ph + 1), stride_h):
+                for w in range(0, max(1, W - pw + 1), stride_w):
+
+                    dp = dwi[d:d+pd, h:h+ph, w:w+pw]
+                    ap = adc[d:d+pd, h:h+ph, w:w+pw]
+
+                    inp = np.stack([dp, ap], 0)
+                    inp = torch.tensor(inp).unsqueeze(0).to(device)
+
+                    out = _model(inp)
+                    prob = torch.sigmoid(out).cpu().numpy()[0, 0]
+
+                    pred[d:d+pd, h:h+ph, w:w+pw] += prob
+                    count[d:d+pd, h:h+ph, w:w+pw] += 1
+
+    return pred / np.maximum(count, 1e-6)
+
+
+# ─────────────────────────────
+# 🔥 FIXED DECISION ENGINE (V6)
+# ─────────────────────────────
+def decision_engine(prob_map):
+
+    # CLEAN THRESHOLDS
+    soft_mask = prob_map > 0.35
+    hard_mask = prob_map > 0.60
+
+    labeled, n = label(soft_mask)
+
+    if n == 0:
+        return False, 0.0, 0.0, None, 0
+
+    # ── keep top 2 components (FIX FP issue)
+    sizes = [(labeled == i).sum() for i in range(1, n + 1)]
+    top_idx = np.argsort(sizes)[::-1][:2]
+
+    final_mask = np.zeros_like(prob_map, dtype=bool)
+
+    for i in top_idx:
+        final_mask |= (labeled == (i + 1))
+
+    voxel_count = float(final_mask.sum())
+    confidence = float(prob_map[final_mask].mean())
+
+    # robust statistics
+    high_conf_voxels = float((prob_map > 0.6).sum())
+
+    # ham sinyal sayısı (temizlemeden önce)
+    raw_signal = int(soft_mask.sum())
+
+    lesion = False
+
+    # ── SAFE RULES (IMPORTANT FIX)
+    if confidence > 0.68 and voxel_count > 60:
+        lesion = True
+
+    if high_conf_voxels > 120:
+        lesion = True
+
+    # suppress false positives (CRITICAL)
+    if voxel_count < 25:
+        lesion = False
+
+    if confidence < 0.50:
+        lesion = False
+
+    # HEALTHY CONTROL (VERY IMPORTANT FIX)
+    if high_conf_voxels < 30 and voxel_count < 80:
+        lesion = False
+
+    return lesion, voxel_count, confidence, final_mask, raw_signal
+
+
+# ─────────────────────────────
+# COMMENT GENERATOR (V6.1)
+# ─────────────────────────────
+def _generate_comment(lesion_detected, lesion_volume, confidence, raw_signal=0):
+    if not lesion_detected and raw_signal > 0:
+        return (
+            "MR goruntusunde belirgin bir lezyon tespit edilmemistir, "
+            "ancak kucuk suphe alanlari gozlenmistir. "
+            "Klinik bulgularla birlikte degerlendirilmesi ve "
+            "gerekirse kontrol MR cekilmesi onerilir."
+        )
     if not lesion_detected:
         return (
-            "MR görüntüsünde anlamlı bir lezyon tespit edilmemiştir. "
-            "Klinik bulgularla birlikte değerlendirilmesi önerilir."
+            "MR goruntusunde anlamli bir lezyon tespit edilmemistir. "
+            "Klinik bulgularla birlikte degerlendirilmesi onerilir."
         )
-    severity = (
-        "küçük"  if lesion_volume < 500  else
-        "orta"   if lesion_volume < 2000 else
-        "büyük"
-    )
+    severity = "kucuk" if lesion_volume < 500 else "orta" if lesion_volume < 2000 else "buyuk"
     return (
-        f"MR görüntüsünde {severity} boyutta olası bir lezyon tespit edilmiştir "
-        f"(yaklaşık {int(lesion_volume)} voksel, güven skoru: {confidence:.2f}). "
-        f"Kesin tanı için nöroloji uzmanı değerlendirmesi önerilir. "
-        f"Bu sonuç yalnızca yardımcı karar destek aracıdır."
+        f"MR goruntusunde {severity} boyutta olasi bir lezyon tespit edilmistir "
+        f"(yaklasik {int(lesion_volume)} voksel, guven skoru: {confidence:.2f}). "
+        f"Kesin tani icin noroloji uzmani degerlendirmesi onerilir. "
+        f"Bu sonuc yalnizca yardimci karar destek aracidir."
     )
 
 
-def _generate_attention_map(tensor: torch.Tensor, scan_id: int) -> str | None:
-    """
-    Attention U-Net'in att4 gate'inden ısı haritası üret.
-    Multimodal tensor (1, 2, H, W, D) — DWI kanalı (0) görselleştirilir.
-    """
-    try:
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
+# ─────────────────────────────
+# TASK
+# ─────────────────────────────
+@celery_app.task(bind=True, name="mr_tasks.analyze_mr")
+def analyze_mr(self, scan_id, file_paths, patient_id):
 
-        attention_maps = []
-
-        def hook_fn(module, input, output):
-            attention_maps.append(output.detach().cpu())
-
-        hook = _model.att4.psi.register_forward_hook(hook_fn)
-        with torch.no_grad():
-            _ = _model(tensor)
-        hook.remove()
-
-        if not attention_maps:
-            return None
-
-        # att4 çıktısı: (1, 1, H, W, D) → squeeze → (H, W, D)
-        attn = attention_maps[0].squeeze().numpy()
-
-        # En aktif axial slice
-        slice_scores = attn.sum(axis=(0, 1)) if attn.ndim == 3 else attn.sum(axis=(1, 2))
-        best_slice   = int(np.argmax(slice_scores))
-
-        if attn.ndim == 3:
-            attn_2d = attn[:, :, best_slice]
-        else:
-            attn_2d = attn
-
-        attn_2d = (attn_2d - attn_2d.min()) / (attn_2d.max() - attn_2d.min() + 1e-8)
-
-        # DWI kanalını (kanal 0) görsel için kullan
-        orig_vol = tensor.cpu().squeeze().numpy()  # (2, H, W, D)
-        dwi_vol  = orig_vol[0]                     # (H, W, D)
-        z_idx    = min(best_slice, dwi_vol.shape[2] - 1)
-        orig_2d  = dwi_vol[:, :, z_idx]
-
-        # ADC kanalı
-        adc_vol = orig_vol[1]
-        adc_2d  = adc_vol[:, :, z_idx]
-
-        # Boyut eşitle
-        if orig_2d.shape != attn_2d.shape:
-            attn_2d = zoom(attn_2d, [orig_2d.shape[0] / attn_2d.shape[0],
-                                      orig_2d.shape[1] / attn_2d.shape[1]], order=1)
-
-        # Görselleştir: DWI | ADC | Attention overlay | Odak yoğunluğu
-        fig, axes = plt.subplots(1, 4, figsize=(16, 4))
-        fig.patch.set_facecolor('#1a1a2e')
-
-        axes[0].imshow(orig_2d.T, cmap='gray', origin='lower')
-        axes[0].set_title('DWI', color='white', fontsize=11)
-        axes[0].axis('off')
-
-        axes[1].imshow(adc_2d.T, cmap='gray', origin='lower')
-        axes[1].set_title('ADC', color='white', fontsize=11)
-        axes[1].axis('off')
-
-        axes[2].imshow(orig_2d.T, cmap='gray', origin='lower')
-        axes[2].imshow(attn_2d.T, cmap='jet', alpha=0.5, origin='lower')
-        axes[2].set_title('Attention Haritası (XAI)', color='white', fontsize=11)
-        axes[2].axis('off')
-
-        im = axes[3].imshow(attn_2d.T, cmap='jet', origin='lower')
-        axes[3].set_title('Odak Yoğunluğu', color='white', fontsize=11)
-        axes[3].axis('off')
-        plt.colorbar(im, ax=axes[3], fraction=0.046, pad=0.04)
-
-        plt.suptitle(f'Açıklanabilir AI — DWI+ADC | Slice {best_slice}',
-                     color='white', fontsize=13, y=1.02)
-        plt.tight_layout()
-
-        gradcam_dir  = os.path.join("uploads", "mr_gradcam")
-        os.makedirs(gradcam_dir, exist_ok=True)
-        gradcam_path = os.path.join(gradcam_dir, f"gradcam_{scan_id}.png")
-        plt.savefig(gradcam_path, dpi=120, bbox_inches='tight',
-                    facecolor='#1a1a2e', edgecolor='none')
-        plt.close()
-
-        print(f"[Task] Attention haritası kaydedildi: {gradcam_path}")
-        return gradcam_path
-
-    except Exception as e:
-        print(f"[Task] Attention haritası oluşturulamadı: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
-
-
-# ── Ana Celery Task ──────────────────────────────────────────────────
-@celery_app.task(bind=True, name="mr_tasks.analyze_mr", acks_late=True)
-def analyze_mr(self, scan_id: int, file_paths: dict, patient_id: int):
-    """
-    Multimodal MR görüntüsünü analiz eden arka plan görevi.
-
-    Args:
-        scan_id:    DB'deki MrScan id
-        file_paths: {'dwi': '...', 'adc': '...'}
-        patient_id: Hasta user id
-    """
     db = SessionLocal()
+
     try:
         from app.models.mr_scan import MrScan
         from app.services.notification_service import notify
         from app.models.doctor_patient import DoctorPatient
 
-        print(f"[Task] analyze_mr başladı — scan_id: {scan_id}")
-        print(f"[Task] Dosyalar: DWI={file_paths.get('dwi')} | ADC={file_paths.get('adc')}")
+        dwi = _load_volume(file_paths['dwi'])
+        adc = _load_volume(file_paths['adc'])
 
-        # ── 1. Her iki modaliteyi yükle ──────────────────────────────
-        dwi_path = file_paths.get('dwi')
-        adc_path = file_paths.get('adc')
+        pred = sliding_window(dwi, adc)
 
-        if not dwi_path or not adc_path:
-            raise ValueError(f"Eksik modalite — file_paths: {file_paths}")
+        lesion, voxel, conf, mask, raw_signal = decision_engine(pred)
 
-        dwi = _load_volume(dwi_path)
-        adc = _load_volume(adc_path)
+        print(f"[V6] Lesion: {lesion} | Vox: {voxel:.1f} | Conf: {conf:.3f} | Raw: {raw_signal}")
 
-        orig_shape = nib.load(dwi_path).get_fdata().shape[:3]
-        print(f"[Task] DWI shape: {dwi.shape} | ADC shape: {adc.shape}")
+        mask_path = f"uploads/mask_{scan_id}.npy"
+        if mask is not None:
+            np.save(mask_path, mask.astype(np.uint8))
+        else:
+            np.save(mask_path, np.zeros((1,), dtype=np.uint8))
 
-        # ── 2. Stack → tensor (1, 2, H, W, D) ───────────────────────
-        volume = np.stack([dwi, adc], axis=0)  # (2, H, W, D)
-        tensor = torch.tensor(volume, dtype=torch.float32).unsqueeze(0).to(device)
+        comment = _generate_comment(lesion, voxel, conf, raw_signal)
 
-        # ── 3. Model inference ───────────────────────────────────────
-        print("[Task] Model inference başlıyor...")
-        with torch.no_grad():
-            logits = _model(tensor)
-            probs  = torch.sigmoid(logits).cpu().numpy()[0, 0]
-        print("[Task] Model inference tamamlandı!")
-
-        mask = (probs > THRESHOLD).astype(np.float32)
-
-        # Orijinal boyuta geri getir
-        factors   = [o / t for o, t in zip(orig_shape, TARGET_SHAPE)]
-        mask_orig = zoom(mask, factors, order=0)
-        mask_orig = (mask_orig > 0.5).astype(np.float32)
-
-        # ── 4. Metrikler ─────────────────────────────────────────────
-        lesion_volume   = float(mask_orig.sum())
-        lesion_detected = lesion_volume > 10
-        confidence      = float(probs[mask > THRESHOLD].mean()) if mask.sum() > 0 else 0.0
-        print(f"[Task] Lezyon: {lesion_detected}, Hacim: {lesion_volume:.1f}, Güven: {confidence:.4f}")
-
-        # ── 5. Maskeyi kaydet ────────────────────────────────────────
-        mask_dir  = os.path.join("uploads", "mr_masks")
-        os.makedirs(mask_dir, exist_ok=True)
-        mask_path = os.path.join(mask_dir, f"mask_{scan_id}.npy")
-        np.save(mask_path, mask_orig)
-
-        # ── 6. Attention haritası üret (XAI) ─────────────────────────
-        print("[Task] Attention haritası üretiliyor...")
-        gradcam_path = _generate_attention_map(tensor, scan_id)
-
-        # ── 7. DB güncelle ───────────────────────────────────────────
         scan = db.query(MrScan).filter(MrScan.id == scan_id).first()
+
         if scan:
-            scan.lesion_detected = lesion_detected
-            scan.lesion_volume   = lesion_volume
-            scan.dice_confidence = round(confidence, 4)
-            scan.mask_path       = mask_path
-            scan.gradcam_path    = gradcam_path
-            scan.ai_comment      = _generate_comment(lesion_detected, lesion_volume, confidence)
-            scan.status          = "done"
-            scan.result_data     = {
-                "lesion_detected": lesion_detected,
-                "lesion_volume":   lesion_volume,
-                "dice_confidence": round(confidence, 4),
-                "model":           MODEL_INFO["model_name"],
-                "modalities":      MODALITIES,
-                "val_dice":        MODEL_INFO["val_dice"],
-                "threshold":       THRESHOLD,
-                "gradcam":         gradcam_path is not None,
+            scan.lesion_detected = lesion
+            scan.lesion_volume = voxel
+            scan.dice_confidence = conf
+            scan.mask_path = mask_path
+            scan.ai_comment = comment
+            scan.status = "done"
+            scan.result_data = {
+                "lesion_detected": lesion,
+                "lesion_volume": voxel,
+                "dice_confidence": round(conf, 4),
+                "raw_signal": raw_signal,
+                "model": MODEL_INFO.get("model_name", "ResUNet3D_DS"),
+                "model_version": MODEL_INFO.get("model_version", "4.0"),
+                "val_dice": MODEL_INFO.get("val_dice", 0.7426),
             }
             db.commit()
-            print(f"[Task] DB güncellendi — status: done")
 
-        # ── 8. Bildirimleri gönder ───────────────────────────────────
+        # Bildirimler
         doctor_links = db.query(DoctorPatient).filter(
             DoctorPatient.patient_id == patient_id,
-            DoctorPatient.status == "onaylandı"
+            DoctorPatient.status == "onaylandi"
         ).all()
         for link in doctor_links:
-            notify(
-                db=db,
-                user_id=link.doctor_id,
-                event="mr_analyzed",
-                title="MR Analizi Tamamlandı",
-                body=f"Hastanızın MR analizi hazır: "
-                     f"{'⚠️ Lezyon tespit edildi' if lesion_detected else '✅ Lezyon tespit edilmedi'}",
-                metadata={"mr_scan_id": scan_id}
-            )
+            notify(db=db, user_id=link.doctor_id, event="mr_analyzed",
+                   title="MR Analizi Tamamlandi",
+                   body=f"Hastanizin MR analizi hazir: {'Lezyon tespit edildi' if lesion else 'Lezyon tespit edilmedi'}",
+                   metadata={"mr_scan_id": scan_id})
 
-        notify(
-            db=db,
-            user_id=patient_id,
-            event="mr_analyzed",
-            title="MR Analiziniz Hazır",
-            body="MR görüntünüzün analizi tamamlandı. Sonuçları görmek için tıklayın.",
-            metadata={"mr_scan_id": scan_id}
-        )
+        notify(db=db, user_id=patient_id, event="mr_analyzed",
+               title="MR Analiziniz Hazir",
+               body="MR goruntunuzun analizi tamamlandi. Sonuclari gormek icin tiklayin.",
+               metadata={"mr_scan_id": scan_id})
 
-        print(f"[Task] analyze_mr tamamlandı — scan_id: {scan_id}")
-        return {"status": "done", "scan_id": scan_id, "lesion_detected": lesion_detected}
+        return {
+            "lesion": lesion,
+            "voxel": voxel,
+            "confidence": conf,
+            "raw_signal": raw_signal
+        }
 
     except Exception as e:
-        print(f"[Task] HATA: {str(e)}")
+        print("[ERROR]", str(e))
         import traceback
         traceback.print_exc()
         scan = db.query(MrScan).filter(MrScan.id == scan_id).first()
         if scan:
-            scan.status     = "error"
-            scan.ai_comment = f"Analiz hatası: {str(e)}"
+            scan.status = "error"
+            scan.ai_comment = f"Analiz hatasi: {str(e)}"
             db.commit()
         raise
 

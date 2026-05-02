@@ -12,8 +12,15 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import EditIcon from "@mui/icons-material/Edit";
 import axios from "axios";
 import { MrScan } from "../../types/MrScan";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 
 const primaryColor = "#0a2d57";
+
+const isSuspicious = (scan: MrScan): boolean => {
+  if (scan.lesion_detected) return false;
+  const volume = scan.lesion_volume ?? 0;
+  return volume > 0 && volume < 200;
+};
 
 interface Props {
   scans: MrScan[];
@@ -102,11 +109,13 @@ const DoctorMrList: React.FC<Props> = ({ scans, onRefresh }) => {
                   />
                 </TableCell>
                 <TableCell>
-                  {scan.status === "done" ? (
-                    scan.lesion_detected
-                      ? <WarningAmberIcon sx={{ color: "#ff9800" }} />
-                      : <CheckCircleIcon sx={{ color: "#4caf50" }} />
-                  ) : (
+                 {scan.status === "done" ? (
+  scan.lesion_detected
+    ? <WarningAmberIcon sx={{ color: "#ff9800" }} />
+    : isSuspicious(scan)
+      ? <HelpOutlineIcon sx={{ color: "#f9a825" }} />
+      : <CheckCircleIcon sx={{ color: "#4caf50" }} />
+) : (
                     scan.status === "pending" ? <CircularProgress size={16} /> : "—"
                   )}
                 </TableCell>
@@ -117,7 +126,7 @@ const DoctorMrList: React.FC<Props> = ({ scans, onRefresh }) => {
                   {scan.dice_confidence != null ? `%${Math.round(scan.dice_confidence * 100)}` : "—"}
                 </TableCell>
                 <TableCell sx={{ maxWidth: 300 }}>
-                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  <Typography variant="caption" sx={{ color: isSuspicious(scan) ? "#f57f17" : "text.secondary" }}>
                     {scan.ai_comment
                       ? scan.ai_comment.length > 80
                         ? scan.ai_comment.slice(0, 80) + "..."
@@ -138,8 +147,13 @@ const DoctorMrList: React.FC<Props> = ({ scans, onRefresh }) => {
                       }}>
                         {/* AI yorumun tamamı */}
                         {scan.ai_comment && (
-                          <Box sx={{ mb: 2, p: 2, bgcolor: "#e3f2fd", borderRadius: 1, borderLeft: `4px solid ${primaryColor}` }}>
-                            <Typography variant="caption" fontWeight={600} color="text.secondary">
+                          <Box sx={{
+  mb: 2, p: 2, borderRadius: 1,
+  bgcolor: isSuspicious(scan) ? "#fff8e1" : "#e3f2fd",
+  borderLeft: `4px solid ${isSuspicious(scan) ? "#f9a825" : primaryColor}`,
+}}>
+  <Typography variant="caption" fontWeight={600}
+    color={isSuspicious(scan) ? "#f57f17" : "text.secondary"}>
                               🤖 AI Değerlendirmesi
                             </Typography>
                             <Typography variant="body2" sx={{ mt: 0.5 }}>{scan.ai_comment}</Typography>

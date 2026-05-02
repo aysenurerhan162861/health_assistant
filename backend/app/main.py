@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import users, doctors, patients, assistants, lab_reports, notification, chat_socket, meals, blood_pressure, chat, mr_scans
+from app.api import users, doctors, patients, assistants, lab_reports, notification, chat_socket, meals, blood_pressure, chat, mr_scans, step_records
 from app.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -36,3 +36,4 @@ app.include_router(notification.router, prefix="/api/notification")
 app.include_router(chat_socket.router, prefix="")
 app.include_router(chat.router, prefix="/api/chat")
 app.include_router(mr_scans.router, prefix="/api/mr_scans")
+app.include_router(step_records.router, prefix="/api/step_records")

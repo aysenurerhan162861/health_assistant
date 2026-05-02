@@ -25,6 +25,7 @@ import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import DirectionsWalkIcon from "@mui/icons-material/DirectionsWalk";
 
 import { getApprovedPatients, getPendingPatients, getMyDoctors } from "../../services/PatientApi";
 import { getUnreadLabCount } from "../../services/LabApi";
@@ -348,21 +349,24 @@ export default function DashboardHome() {
         Hızlı Erişim
       </Typography>
       <Grid container spacing={2}>
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
+        <Grid size={{ xs: 6, sm: 4, md: 4 }}>
           <ActionCard icon={<ScienceIcon />} label="Tahlillerim" description="Lab raporlarım" href="/tahlil" color="#2e7d32" bg="#e8f5e9" />
         </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
+        <Grid size={{ xs: 6, sm: 4, md: 4 }}>
           <ActionCard icon={<RestaurantIcon />} label="Öğün Analizi" description="Yemek takibim" href="/ogun" color="#e65100" bg="#fff3e0" />
         </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
+        <Grid size={{ xs: 6, sm: 4, md: 4 }}>
           <ActionCard icon={<MonitorHeartIcon />} label="Tansiyon" description="Ölçüm geçmişim" href="/tansiyon" color="#c62828" bg="#ffebee" />
         </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
+        <Grid size={{ xs: 6, sm: 4, md: 4 }}>
           <ActionCard icon={<BiotechIcon />} label="MR Analizi" description="MR görüntülerim" href="/mr-analizi" color="#6a1b9a" bg="#f3e5f5" />
         </Grid>
-        <Grid size={{ xs: 6, sm: 4, md: 2.4 }}>
+        <Grid size={{ xs: 6, sm: 4, md: 4 }}>
           <ActionCard icon={<TrendingUpIcon />} label="Trendler" description="Sağlık trendlerim" href="/trendler" color="#0277bd" bg="#e1f5fe" />
         </Grid>
+        <Grid size={{ xs: 6, sm: 4, md: 4 }}>
+  <ActionCard icon={<DirectionsWalkIcon />} label="Adım Takibi" description="Günlük adımlarım" href="/adim-takibi" color="#00838f" bg="#e0f7fa" />
+</Grid>
       </Grid>
     </Box>
   );

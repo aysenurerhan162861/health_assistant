@@ -12,6 +12,7 @@ import {
   Avatar,
   ListItemIcon,
   Collapse,
+  StepIcon,
 } from "@mui/material";
 import Link from "next/link";
 import DashboardIcon from "@mui/icons-material/Dashboard";
@@ -28,6 +29,7 @@ import ExpandMore from "@mui/icons-material/ExpandMore";
 import axios from "axios";
 import BiotechIcon from "@mui/icons-material/Biotech";
 import MedicalInformationIcon from "@mui/icons-material/MedicalInformation";
+import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk';
 
 interface SidebarProps {
   user?: {
@@ -128,6 +130,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
     { text: "Öğün Analizi",  icon: <RestaurantIcon fontSize="small" />,  href: "/ogun" },
     { text: "Tansiyon",      icon: <MonitorHeartIcon fontSize="small" />, href: "/tansiyon" },
     { text: "MR Analizi",    icon: <FavoriteIcon fontSize="small" />,    href: "/mr-analizi" },
+    { text: "Adım Takibi",   icon: <DirectionsWalkIcon fontSize="small" />,    href: "/adim-takibi" },
   ];
 
   const assistantItems: MenuItem[] = [
@@ -136,6 +139,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
     { text: "Tansiyon",      icon: <MonitorHeartIcon fontSize="small" />,        href: "/dashboard/assistant/blood-pressure" },
     { text: "Tahliller",     icon: <MedicalInformationIcon fontSize="small" />,  href: "/dashboard/assistant/labs" },
     { text: "MR Analizleri", icon: <BiotechIcon fontSize="small" />,            href: "/dashboard/assistant/mr" },
+    
   ];
 
   const commonItems: MenuItem[] = [

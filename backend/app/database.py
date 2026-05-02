@@ -32,5 +32,6 @@ from app.models import (
     blood_pressure_tracking,
     blood_pressure_measurement,
     chat_message,
+    step_record
 )
 

@@ -184,7 +184,7 @@ async def upload_mr_scan(
     # ── 4. DB kaydı ──────────────────────────────────────────────────
     scan = MrScan(
         patient_id=patient_id,
-        file_name=os.path.basename(file_paths['dwi']),
+        file_name=files[0].filename,
         file_path=file_paths['dwi'],
         status="pending",
         ai_comment=selected_reason,
